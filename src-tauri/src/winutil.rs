@@ -39,7 +39,16 @@ pub fn toggle_main(app: &AppHandle) {
     let Some(w) = main_window(app) else { return };
     let visible = w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false);
     if visible {
-        if w.is_focused().unwrap_or(false) {
+        // Fenêtre au premier plan, ou qui vient de perdre le focus à cause
+        // de ce clic même (icône de notification) : on la masque.
+        let state = app.state::<AppState>();
+        let just_blurred = state
+            .last_blur
+            .lock()
+            .ok()
+            .and_then(|t| *t)
+            .is_some_and(|t| t.elapsed() < Duration::from_millis(400));
+        if w.is_focused().unwrap_or(false) || just_blurred {
             hide_main(app);
         } else {
             show_main(app);
@@ -61,27 +70,53 @@ pub fn toggle_main(app: &AppHandle) {
 }
 
 /// Perte de focus : masque la fenêtre si l'option est active.
+///
+/// Windows envoie aussi une perte de focus quand on commence à déplacer ou
+/// redimensionner une fenêtre sans bordure. On attend donc un court instant,
+/// puis on ne masque que si la fenêtre n'a pas retrouvé le focus et que la
+/// souris est hors de la fenêtre (vrai clic ailleurs).
 pub fn on_blur(app: &AppHandle) {
     let state = app.state::<AppState>();
-    if state.dialog_open.load(Ordering::SeqCst) {
-        return; // un sélecteur de fichiers Windows est ouvert
+    if let Ok(mut t) = state.last_blur.lock() {
+        *t = Some(Instant::now());
     }
-    let hide = state
-        .config
-        .lock()
-        .map(|c| c.settings.hide_on_blur)
-        .unwrap_or(false);
-    if !hide {
-        return;
-    }
-    if let Some(w) = main_window(app) {
-        if w.is_visible().unwrap_or(false) {
-            if let Ok(mut t) = state.last_blur_hide.lock() {
-                *t = Some(Instant::now());
-            }
-            hide_main(app);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(180));
+        let state = app.state::<AppState>();
+        if state.dialog_open.load(Ordering::SeqCst) {
+            return; // un sélecteur de fichiers Windows est ouvert
         }
-    }
+        let hide = state
+            .config
+            .lock()
+            .map(|c| c.settings.hide_on_blur)
+            .unwrap_or(false);
+        if !hide {
+            return;
+        }
+        let Some(w) = main_window(&app) else { return };
+        if !w.is_visible().unwrap_or(false) || w.is_focused().unwrap_or(false) {
+            return;
+        }
+        if cursor_inside(&w) {
+            return; // déplacement ou redimensionnement en cours
+        }
+        if let Ok(mut t) = state.last_blur_hide.lock() {
+            *t = Some(Instant::now());
+        }
+        hide_main(&app);
+    });
+}
+
+fn cursor_inside(w: &WebviewWindow) -> bool {
+    let (Ok(c), Ok(p), Ok(s)) = (w.cursor_position(), w.outer_position(), w.outer_size()) else {
+        return false;
+    };
+    c.x >= p.x as f64
+        && c.y >= p.y as f64
+        && c.x < p.x as f64 + s.width as f64
+        && c.y < p.y as f64 + s.height as f64
 }
 
 /// Centre la fenêtre sur l'écran où se trouve la souris, sauf si elle y est

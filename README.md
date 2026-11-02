@@ -181,7 +181,7 @@ Ce bouton ne fonctionne que si le dépôt GitHub est **public** : un dépôt pri
 - **Ajouter par clic droit** : sur un onglet (ajoute dans ce groupe), sur « Tout » ou dans le vide de la liste.
 - **Groupes** : bouton **+** à droite des onglets. Clic droit sur un onglet pour le renommer, le déplacer ou le supprimer.
 - **Élément grisé** : son chemin n'existe plus. Cliquez dessus pour corriger le chemin ou le retirer.
-- **Fermer la fenêtre** la masque seulement. Pour quitter : clic droit sur l'icône de notification, puis **Quitter**.
+- **« — » ou « × »** range la fenêtre dans la zone de notification. Cliquer ailleurs la laisse ouverte. Pour quitter : clic droit sur l'icône de notification, puis **Quitter**.
 
 ---
 
@@ -220,7 +220,7 @@ Note honnête sur la RAM : le processus `lanette.exe` lui-même reste léger (de
 - **Résultats de recherche toujours en liste** (avec le chemin), même en vue grille : plus lisible et plus rapide au clavier.
 - **Clic = sélectionner, double-clic = lancer** (comme dans l'Explorateur). Clic droit = sélection + menu.
 - **Chemins masqués par défaut** (bouton « Masquer les chemins » en haut à droite).
-- **Réduire (—)** garde Lanette dans la barre des tâches. **Fermer (×)** la range dans la zone de notification.
+- **« — » et « × »** rangent Lanette dans la zone de notification (elle quitte la barre des tâches). **Cliquer ailleurs ne la masque pas** : elle reste ouverte et visible dans la barre des tâches.
 - **Récents** : les 8 derniers lancés, dans l'onglet « Tout ». Les favoris apparaissent en tête de « Tout » et en tête de leur groupe.
 - **Liens web** : pas de favicon téléchargé (respect du 100 % local). À la place, une pastille colorée avec l'initiale.
 - **Mica sous Windows 11 uniquement**. Windows 10 a un fond opaque : son effet Acrylic rend le déplacement de fenêtre saccadé.

@@ -493,7 +493,6 @@ export function openSettings() {
 
     h("h4", { text: t("settings.behavior") }),
     hotkeyField(),
-    toggle(t("settings.hideOnBlur"), s.hideOnBlur, change((v) => (s.hideOnBlur = v))),
     toggle(t("settings.hideAfterLaunch"), s.hideAfterLaunch, change((v) => (s.hideAfterLaunch = v))),
     toggle(t("settings.showRecents"), s.showRecents, change((v) => (s.showRecents = v))),
     toggle(t("settings.hidePaths"), !!s.hidePaths, change((v) => (s.hidePaths = v)), t("settings.hidePathsSub")),

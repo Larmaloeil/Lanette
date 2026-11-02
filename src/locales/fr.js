@@ -8,12 +8,12 @@ export default {
 
   titlebar: {
     settings: "Paramètres (Ctrl+,)",
-    minimize: "Réduire",
+    minimize: "Réduire dans la zone de notification",
     close: "Masquer (Échap)",
   },
 
   toolbar: {
-    search: "Rechercher…",
+    search: "Rechercher une application, un fichier, un lien…",
     add: "Ajouter",
     addTitle: "Ajouter des éléments (Ctrl+N)",
     grid: "Grille",
@@ -21,7 +21,6 @@ export default {
     sizeS: "Petites icônes",
     sizeM: "Icônes moyennes",
     sizeL: "Grandes icônes",
-    paths: "Masquer les chemins",
     hidePaths: "Masquer les chemins d'accès dans toute l'application",
   },
 
@@ -160,7 +159,6 @@ export default {
     hotkeyHint: "Cliquez puis appuyez sur la combinaison voulue",
     hotkeyWaiting: "Appuyez sur une combinaison…",
     hotkeySaved: "Raccourci enregistré : {hotkey}",
-    hideOnBlur: "Masquer quand on clique ailleurs",
     hideAfterLaunch: "Masquer après avoir lancé un élément",
     showRecents: "Afficher la section Récents",
     hidePaths: "Masquer les chemins d'accès",

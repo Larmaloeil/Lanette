@@ -419,8 +419,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .empty-drop { display: flex; align-items: center; gap: 8px; margin-top: 18px !important; }
 .empty-tip { margin-top: 26px !important; font-size: 12px; }
 
-@media (max-width: 680px) { #size-toggle { display: none; } }
-@media (max-width: 600px) { .toggle-btn span:not(.toggle-check) { display: none; } }
+@media (max-width: 560px) { #size-toggle { display: none; } }
 
 /* Dépôt de fichiers */
 .drop-overlay {
@@ -659,28 +658,24 @@ code.path { display: block; width: 100%; padding: 8px 10px; border-radius: 6px; 
   *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
 }
 
-/* Interrupteur « masquer les chemins » de la barre d'outils */
-.toggle-btn {
-  display: inline-flex; align-items: center; gap: 8px;
-  height: 38px; padding: 0 10px 0 12px;
+/* Bouton icône « masquer les chemins » (enfoncé = chemins masqués) */
+.icon-toggle {
+  width: 38px; height: 38px; display: grid; place-items: center;
   border-radius: var(--radius); border: 1px solid var(--stroke);
-  background: var(--layer); color: var(--text-2); font-size: 12.5px;
-  position: relative;
+  background: var(--layer); color: var(--text-2); position: relative;
 }
-.toggle-btn::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--hover); opacity: 0; transition: opacity var(--fast); }
-.toggle-btn:hover::before { opacity: 1; }
-.toggle-btn > * { position: relative; }
-.toggle-check {
-  width: 16px; height: 16px; border-radius: 4px;
-  border: 1px solid var(--text-3); display: grid; place-items: center;
-}
-.toggle-btn[aria-pressed="true"] .toggle-check { background: var(--accent); border-color: var(--accent); }
-.toggle-btn[aria-pressed="true"] .toggle-check::after {
-  content: ""; width: 8px; height: 4px; margin-top: -2px;
-  border-left: 2px solid var(--on-accent); border-bottom: 2px solid var(--on-accent);
-  transform: rotate(-45deg);
-}
-.toggle-btn[aria-pressed="true"] { color: var(--text); }
+.icon-toggle::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--hover); opacity: 0; transition: opacity var(--fast); }
+.icon-toggle:hover::before { opacity: 1; }
+.icon-toggle .ico { position: relative; width: 18px; height: 18px; }
+.icon-toggle .eye-on { display: none; }
+.icon-toggle[aria-pressed="false"] .eye-on { display: block; }
+.icon-toggle[aria-pressed="false"] .eye-off { display: none; }
+.icon-toggle[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+
+/* Tailles d'icônes : la même icône de fichier en trois tailles */
+.seg-btn .ico.size-s { width: 11px; height: 11px; }
+.seg-btn .ico.size-m { width: 15px; height: 15px; }
+.seg-btn .ico.size-l { width: 19px; height: 19px; }
 
 /* Champ dont le contenu (un chemin) est masqué */
 .input.masked { -webkit-text-security: disc; color: var(--text-3); }

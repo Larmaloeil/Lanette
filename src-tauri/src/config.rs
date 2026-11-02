@@ -30,7 +30,6 @@ pub struct Settings {
     pub view: String,
     /// Accélérateur au format Tauri, ex. "Alt+Space"
     pub hotkey: String,
-    pub hide_on_blur: bool,
     pub hide_after_launch: bool,
     pub show_recents: bool,
     /// Masque les chemins d'accès partout dans l'interface.
@@ -49,7 +48,6 @@ impl Default for Settings {
             icon_size: "m".into(),
             view: "grid".into(),
             hotkey: "Alt+Space".into(),
-            hide_on_blur: true,
             hide_after_launch: true,
             show_recents: true,
             hide_paths: true,

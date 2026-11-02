@@ -1,5 +1,5 @@
 // Point d'entrée : démarrage, événements, clavier, lancement, menus.
-import { invoke, listen, appWindow, webview } from "./api.js";
+import { invoke, listen, webview } from "./api.js";
 import { t, setLanguage, applyStatic, formatHotkey } from "./i18n.js";
 import { state, settings, save, flushSave, findItem, findGroup, addItems, applySectionOrder, moveToGroup, addGroup, deleteGroup, moveGroup, checkBroken } from "./store.js";
 import { render, renderContent, renderTabs, moveIndicator, handlers, select, moveVertical, selectedEntry, looksLikeUrl, looksLikePath, logoSvg } from "./render.js";
@@ -49,9 +49,9 @@ function renderToolbarToggles() {
   );
   $("size-toggle").replaceChildren(
     segmented([
-      { value: "s", label: "S", title: t("toolbar.sizeS") },
-      { value: "m", label: "M", title: t("toolbar.sizeM") },
-      { value: "l", label: "L", title: t("toolbar.sizeL") },
+      { value: "s", icon: "file", iconClass: "size-s", title: t("toolbar.sizeS") },
+      { value: "m", icon: "file", iconClass: "size-m", title: t("toolbar.sizeM") },
+      { value: "l", icon: "file", iconClass: "size-l", title: t("toolbar.sizeL") },
     ], s.iconSize, (v) => {
       s.iconSize = v;
       save();
@@ -434,7 +434,8 @@ searchEl.addEventListener("paste", () => requestAnimationFrame(() => {
 // ---------------------------------------------------------------------------
 // Barre de titre et barre d'outils
 $("btn-close").addEventListener("click", () => invoke("hide_window"));
-$("btn-min").addEventListener("click", () => appWindow().minimize());
+// « — » range Lanette dans la zone de notification (elle quitte la barre des tâches).
+$("btn-min").addEventListener("click", () => invoke("hide_window"));
 $("btn-settings").addEventListener("click", () => openSettings());
 $("btn-add").addEventListener("click", () => openAddDialog());
 $("btn-paths").addEventListener("click", () => {

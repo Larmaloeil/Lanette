@@ -375,7 +375,7 @@ export function segmented(options, value, onChange) {
           onChange(o.value);
         },
       },
-      o.icon ? icon(o.icon) : null,
+      o.icon ? icon(o.icon, o.iconClass || "") : null,
       o.label ? h("span", { text: o.label }) : null
     );
     wrap.append(b);

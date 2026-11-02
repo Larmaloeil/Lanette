@@ -69,58 +69,15 @@ pub fn toggle_main(app: &AppHandle) {
     }
 }
 
-/// Perte de focus : masque la fenêtre si l'option est active.
-///
-/// Windows envoie aussi une perte de focus quand on commence à déplacer ou
-/// redimensionner une fenêtre sans bordure. On attend donc un court instant,
-/// puis on ne masque que si la fenêtre n'a pas retrouvé le focus et que la
-/// souris est hors de la fenêtre (vrai clic ailleurs).
+/// Perte de focus : Lanette reste affichée (elle ne se masque que par le
+/// bouton « — », la touche Échap, le raccourci global ou l'icône de
+/// notification). On note seulement l'instant, pour que le clic sur l'icône de
+/// notification sache que la fenêtre vient d'être quittée.
 pub fn on_blur(app: &AppHandle) {
     let state = app.state::<AppState>();
     if let Ok(mut t) = state.last_blur.lock() {
         *t = Some(Instant::now());
-    }
-    let app = app.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(180));
-        let state = app.state::<AppState>();
-        if state.dialog_open.load(Ordering::SeqCst) {
-            return; // un sélecteur de fichiers Windows est ouvert
-        }
-        let hide = state
-            .config
-            .lock()
-            .map(|c| c.settings.hide_on_blur)
-            .unwrap_or(false);
-        if !hide {
-            return;
-        }
-        let Some(w) = main_window(&app) else { return };
-        // Réduite dans la barre des tâches : elle doit y rester.
-        if !w.is_visible().unwrap_or(false)
-            || w.is_minimized().unwrap_or(false)
-            || w.is_focused().unwrap_or(false)
-        {
-            return;
-        }
-        if cursor_inside(&w) {
-            return; // déplacement ou redimensionnement en cours
-        }
-        if let Ok(mut t) = state.last_blur_hide.lock() {
-            *t = Some(Instant::now());
-        }
-        hide_main(&app);
-    });
-}
-
-fn cursor_inside(w: &WebviewWindow) -> bool {
-    let (Ok(c), Ok(p), Ok(s)) = (w.cursor_position(), w.outer_position(), w.outer_size()) else {
-        return false;
     };
-    c.x >= p.x as f64
-        && c.y >= p.y as f64
-        && c.x < p.x as f64 + s.width as f64
-        && c.y < p.y as f64 + s.height as f64
 }
 
 /// Centre la fenêtre sur l'écran où se trouve la souris, sauf si elle y est

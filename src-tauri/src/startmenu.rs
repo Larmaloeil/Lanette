@@ -2,21 +2,22 @@
 //! installées du Microsoft Store (dossier virtuel shell:AppsFolder).
 
 use crate::shell::{self, take_pwstr, ComGuard};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use windows::Win32::UI::Shell::{
-    BHID_EnumItems, FOLDERID_AppsFolder, IEnumShellItems, IShellItem, SHGetKnownFolderItem,
-    KF_FLAG_DEFAULT, SIGDN_NORMALDISPLAY, SIGDN_PARENTRELATIVEPARSING,
+    BHID_EnumItems, FOLDERID_AppsFolder, FOLDERID_Desktop, FOLDERID_PublicDesktop, IEnumShellItems,
+    IShellItem, SHGetKnownFolderItem, SHGetKnownFolderPath, KF_FLAG_DEFAULT, SIGDN_NORMALDISPLAY,
+    SIGDN_PARENTRELATIVEPARSING,
 };
 
-#[derive(Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct Candidate {
     pub name: String,
     pub kind: String,
     pub target: String,
-    /// "startmenu" | "store"
+    /// "startmenu" | "desktop" | "store"
     pub source: String,
 }
 
@@ -68,68 +69,120 @@ fn start_menu_roots() -> Vec<PathBuf> {
     roots
 }
 
+/// Bureaux de l'utilisateur et public (beaucoup de jeux n'y créent qu'un raccourci).
+fn desktop_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    for id in [&FOLDERID_Desktop, &FOLDERID_PublicDesktop] {
+        if let Ok(p) = unsafe { SHGetKnownFolderPath(id, KF_FLAG_DEFAULT, None) } {
+            let s = unsafe { take_pwstr(p) };
+            if !s.is_empty() {
+                roots.push(PathBuf::from(s));
+            }
+        }
+    }
+    roots
+}
+
+/// Raccourcis (.lnk / .url) du menu Démarrer.
+pub fn start_menu_files() -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    for root in start_menu_roots() {
+        walk(&root, 0, &mut files);
+    }
+    files
+}
+
+/// Raccourcis posés directement sur les bureaux (sans sous-dossiers).
+pub fn desktop_files() -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    for root in desktop_roots() {
+        walk(&root, 6, &mut files);
+    }
+    files
+}
+
+/// Ce qu'on fait d'un raccourci trouvé sur le disque.
+pub enum Verdict {
+    Keep(Candidate),
+    /// Sans intérêt (désinstalleur, document...) : on n'y reviendra pas.
+    Skip,
+    /// Cible absente : l'installation est peut-être encore en cours.
+    Retry,
+}
+
+pub fn file_verdict(f: &Path, source: &str) -> Verdict {
+    let path = f.to_string_lossy().into_owned();
+    let name = f.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    if name.is_empty() || is_noise(&name) {
+        return Verdict::Skip;
+    }
+    if shell::ext_lower(&path) == "lnk" {
+        // On garde les raccourcis vers des programmes (ou sans cible lisible,
+        // ex. raccourcis MSI "advertised"), pas ceux vers des documents.
+        if let Some(info) = shell::resolve_lnk(&path) {
+            let t = info.target.trim();
+            if !t.is_empty() {
+                let ext = shell::ext_lower(t);
+                if !matches!(ext.as_str(), "exe" | "msc" | "cpl" | "bat" | "cmd") {
+                    return Verdict::Skip;
+                }
+                if !shell::is_unc(t) && !Path::new(t).exists() {
+                    return Verdict::Retry; // raccourci cassé, ou programme pas encore copié
+                }
+            }
+        }
+    }
+    Verdict::Keep(Candidate { name, kind: "lnk".into(), target: path, source: source.into() })
+}
+
+/// Applications du Store / packagées : leur identifiant contient un "!".
+pub fn store_apps() -> Vec<Candidate> {
+    let mut out = Vec::new();
+    unsafe {
+        let Ok(folder) = SHGetKnownFolderItem::<IShellItem>(&FOLDERID_AppsFolder, KF_FLAG_DEFAULT, None) else {
+            return out;
+        };
+        let Ok(en) = folder.BindToHandler::<_, IEnumShellItems>(None, &BHID_EnumItems) else {
+            return out;
+        };
+        loop {
+            let mut items: [Option<IShellItem>; 1] = [None];
+            let mut fetched = 0u32;
+            if en.Next(&mut items, Some(&mut fetched)).is_err() || fetched == 0 {
+                break;
+            }
+            let Some(it) = items[0].take() else { break };
+            let name = it.GetDisplayName(SIGDN_NORMALDISPLAY).map(|p| take_pwstr(p)).unwrap_or_default();
+            let id = it.GetDisplayName(SIGDN_PARENTRELATIVEPARSING).map(|p| take_pwstr(p)).unwrap_or_default();
+            if name.is_empty() || !id.contains('!') || is_noise(&name) {
+                continue;
+            }
+            out.push(Candidate {
+                name,
+                kind: "app".into(),
+                target: format!("shell:AppsFolder\\{id}"),
+                source: "store".into(),
+            });
+        }
+    }
+    out
+}
+
 pub fn scan() -> Vec<Candidate> {
     let _com = ComGuard::new();
     let mut out = Vec::new();
     let mut seen = HashSet::new();
 
-    let mut files = Vec::new();
-    for root in start_menu_roots() {
-        walk(&root, 0, &mut files);
-    }
-    for f in files {
-        let path = f.to_string_lossy().into_owned();
-        let name = f.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-        if name.is_empty() || is_noise(&name) {
-            continue;
-        }
-        if shell::ext_lower(&path) == "lnk" {
-            // On garde les raccourcis vers des programmes (ou sans cible lisible,
-            // ex. raccourcis MSI "advertised"), pas ceux vers des documents.
-            if let Some(info) = shell::resolve_lnk(&path) {
-                let t = info.target.trim();
-                if !t.is_empty() {
-                    let ext = shell::ext_lower(t);
-                    if !matches!(ext.as_str(), "exe" | "msc" | "cpl" | "bat" | "cmd") {
-                        continue;
-                    }
-                    if !shell::is_unc(t) && !Path::new(t).exists() {
-                        continue; // raccourci cassé
-                    }
-                }
+    for f in start_menu_files() {
+        if let Verdict::Keep(c) = file_verdict(&f, "startmenu") {
+            if seen.insert(c.name.to_lowercase()) {
+                out.push(c);
             }
         }
-        if seen.insert(name.to_lowercase()) {
-            out.push(Candidate { name, kind: "lnk".into(), target: path, source: "startmenu".into() });
-        }
     }
-
-    // Applications du Store / packagées : leur identifiant contient un "!".
-    unsafe {
-        if let Ok(folder) = SHGetKnownFolderItem::<IShellItem>(&FOLDERID_AppsFolder, KF_FLAG_DEFAULT, None) {
-            if let Ok(en) = folder.BindToHandler::<_, IEnumShellItems>(None, &BHID_EnumItems) {
-                loop {
-                    let mut items: [Option<IShellItem>; 1] = [None];
-                    let mut fetched = 0u32;
-                    if en.Next(&mut items, Some(&mut fetched)).is_err() || fetched == 0 {
-                        break;
-                    }
-                    let Some(it) = items[0].take() else { break };
-                    let name = it.GetDisplayName(SIGDN_NORMALDISPLAY).map(|p| take_pwstr(p)).unwrap_or_default();
-                    let id = it.GetDisplayName(SIGDN_PARENTRELATIVEPARSING).map(|p| take_pwstr(p)).unwrap_or_default();
-                    if name.is_empty() || !id.contains('!') || is_noise(&name) {
-                        continue;
-                    }
-                    if seen.insert(name.to_lowercase()) {
-                        out.push(Candidate {
-                            name,
-                            kind: "app".into(),
-                            target: format!("shell:AppsFolder\\{id}"),
-                            source: "store".into(),
-                        });
-                    }
-                }
-            }
+    for c in store_apps() {
+        if seen.insert(c.name.to_lowercase()) {
+            out.push(c);
         }
     }
 

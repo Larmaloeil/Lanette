@@ -131,6 +131,8 @@ impl Drop for DialogGuard<'_> {
 pub async fn pick(app: AppHandle, kind: String) -> Result<Vec<String>, String> {
     let state = app.state::<AppState>();
     let _guard = DialogGuard::new(&state);
+    let en = config::is_english(&state);
+    let tr = |fr: &'static str, en_text: &'static str| if en { en_text } else { fr };
     let mut d = app.dialog().file();
     if let Some(w) = winutil::main_window(&app) {
         d = d.set_parent(&w);
@@ -143,26 +145,26 @@ pub async fn pick(app: AppHandle, kind: String) -> Result<Vec<String>, String> {
     };
     let res = match kind.as_str() {
         "files" => d
-            .set_title("Ajouter des éléments")
-            .add_filter("Programmes et raccourcis", &["exe", "lnk", "url", "bat", "cmd", "msc"])
-            .add_filter("Tous les fichiers", &["*"])
+            .set_title(tr("Ajouter des éléments", "Add items"))
+            .add_filter(tr("Programmes et raccourcis", "Programs and shortcuts"), &["exe", "lnk", "url", "bat", "cmd", "msc"])
+            .add_filter(tr("Tous les fichiers", "All files"), &["*"])
             .blocking_pick_files()
             .map(to_strings),
         "target" => d
-            .set_title("Choisir le nouvel emplacement")
-            .add_filter("Tous les fichiers", &["*"])
+            .set_title(tr("Choisir le nouvel emplacement", "Choose the new location"))
+            .add_filter(tr("Tous les fichiers", "All files"), &["*"])
             .blocking_pick_file()
             .map(|p| to_strings(vec![p])),
         "icon" => d
-            .set_title("Choisir une icône")
-            .add_filter("Images et icônes", &["png", "jpg", "jpeg", "ico", "webp", "svg", "bmp", "exe", "dll"])
+            .set_title(tr("Choisir une icône", "Choose an icon"))
+            .add_filter(tr("Images et icônes", "Images and icons"), &["png", "jpg", "jpeg", "ico", "webp", "svg", "bmp", "exe", "dll"])
             .blocking_pick_file()
             .map(|p| to_strings(vec![p])),
         "folder" | "workdir" => d
-            .set_title(if kind == "folder" { "Ajouter un dossier" } else { "Dossier de travail" })
+            .set_title(if kind == "folder" { tr("Ajouter un dossier", "Add a folder") } else { tr("Dossier de travail", "Working folder") })
             .blocking_pick_folders()
             .map(to_strings),
-        _ => return Err("Type de sélecteur inconnu".into()),
+        _ => return Err("unknown picker".into()),
     };
     Ok(res.unwrap_or_default())
 }
@@ -171,10 +173,11 @@ pub async fn pick(app: AppHandle, kind: String) -> Result<Vec<String>, String> {
 pub async fn export_config(app: AppHandle, config: Config) -> Result<bool, String> {
     let state = app.state::<AppState>();
     let _guard = DialogGuard::new(&state);
+    let en = config::is_english(&state);
     let mut d = app
         .dialog()
         .file()
-        .set_title("Exporter la configuration")
+        .set_title(if en { "Export settings" } else { "Exporter la configuration" })
         .set_file_name("lanette-sauvegarde.json")
         .add_filter("JSON", &["json"]);
     if let Some(w) = winutil::main_window(&app) {
@@ -192,10 +195,11 @@ pub async fn export_config(app: AppHandle, config: Config) -> Result<bool, Strin
 pub async fn import_config(app: AppHandle) -> Result<Option<Config>, String> {
     let state = app.state::<AppState>();
     let _guard = DialogGuard::new(&state);
+    let en = config::is_english(&state);
     let mut d = app
         .dialog()
         .file()
-        .set_title("Importer une configuration")
+        .set_title(if en { "Import settings" } else { "Importer une configuration" })
         .add_filter("JSON", &["json"]);
     if let Some(w) = winutil::main_window(&app) {
         d = d.set_parent(&w);
@@ -209,10 +213,11 @@ pub async fn import_config(app: AppHandle) -> Result<Option<Config>, String> {
 
 /// (Ré)enregistre le raccourci global. En cas d'échec, l'ancien est conservé.
 pub fn apply_hotkey(app: &AppHandle, accel: &str) -> Result<(), String> {
-    let sc: Shortcut = accel
-        .parse()
-        .map_err(|_| format!("Raccourci invalide : « {accel} »"))?;
     let state = app.state::<AppState>();
+    let en = config::is_english(&state);
+    let sc: Shortcut = accel.parse().map_err(|_| {
+        if en { format!("Invalid shortcut: \"{accel}\"") } else { format!("Raccourci invalide : « {accel} »") }
+    })?;
     let gs = app.global_shortcut();
     let mut current = state.hotkey.lock().map_err(|e| e.to_string())?;
     if *current == Some(sc) {
@@ -233,7 +238,11 @@ pub fn apply_hotkey(app: &AppHandle, accel: &str) -> Result<(), String> {
             if let Some(old) = *current {
                 let _ = gs.register(old);
             }
-            Err(format!("« {accel} » est déjà utilisé par Windows ou une autre application."))
+            Err(if en {
+                format!("\"{accel}\" is already used by Windows or another app.")
+            } else {
+                format!("« {accel} » est déjà utilisé par Windows ou une autre application.")
+            })
         }
     }
 }
@@ -283,4 +292,16 @@ pub async fn install_update(app: AppHandle, url: String, size: u64, version: Str
     blocking(move || updater::download_and_install(&app, &url, size, &version))
         .await
         .map_err(|e| UpdateError { code: "download".into(), message: e })?
+}
+
+#[tauri::command]
+pub fn set_language(app: AppHandle, lang: String) {
+    tray::relabel(&app, &lang);
+}
+
+/// Nombre d'applications détectées pas encore vues (infobulle de l'icône).
+#[tauri::command]
+pub fn set_pending(app: AppHandle, count: u32) {
+    let en = config::is_english(&app.state::<AppState>());
+    tray::set_pending(&app, count, if en { "en" } else { "fr" });
 }

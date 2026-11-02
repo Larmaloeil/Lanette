@@ -167,3 +167,50 @@ export async function checkBroken(force = false) {
     return false;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Liste « Pour plus tard » : applications détectées, mises de côté.
+const laterList = () => (state.config.later ||= []);
+export const freshLater = () => laterList().filter((l) => l.fresh);
+
+/**
+ * Applications que le backend vient de détecter. Celles déjà présentes dans
+ * Lanette (même cible ou même nom) ou déjà en attente sont ignorées ; les
+ * autres sont gardées tout de suite dans la liste, marquées « nouvelles ».
+ */
+export function receiveDetected(cands) {
+  const items = state.config.items;
+  const targets = new Set([...items, ...laterList()].map((i) => normTarget(i.target)));
+  const names = new Set(items.map((i) => (i.name || "").trim().toLowerCase()));
+  const fresh = [];
+  for (const c of cands || []) {
+    const key = normTarget(c.target);
+    if (!key || targets.has(key) || names.has((c.name || "").trim().toLowerCase())) continue;
+    targets.add(key);
+    fresh.push({ name: c.name, kind: c.kind || "lnk", target: c.target, source: c.source || "", addedAt: Date.now(), fresh: true });
+  }
+  if (fresh.length) {
+    state.config.later = [...fresh, ...laterList()];
+    save();
+  }
+  return fresh;
+}
+
+export function laterRemove(entries) {
+  const drop = new Set(entries.map((e) => normTarget(e.target)));
+  state.config.later = laterList().filter((l) => !drop.has(normTarget(l.target)));
+  save();
+}
+
+/** Ajoute des éléments de la liste dans Lanette et les en retire. */
+export function laterAdd(entries, groupId = null) {
+  const added = addItems(entries.map((e) => ({ name: e.name, kind: e.kind, target: e.target })), groupId);
+  laterRemove(entries);
+  return added;
+}
+
+export function laterMarkSeen() {
+  let changed = false;
+  for (const l of laterList()) if (l.fresh) (l.fresh = false), (changed = true);
+  if (changed) save();
+}

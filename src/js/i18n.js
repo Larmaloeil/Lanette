@@ -1,7 +1,8 @@
 // Mini système de traduction : t("section.cle", { variable }).
 import fr from "../locales/fr.js";
+import en from "../locales/en.js";
 
-export const LOCALES = { fr };
+export const LOCALES = { fr, en };
 let dict = fr;
 
 export function setLanguage(code) {
@@ -27,8 +28,10 @@ export function applyStatic(root = document) {
   root.querySelectorAll("[data-i18n-placeholder]").forEach((el) => (el.placeholder = t(el.dataset.i18nPlaceholder)));
 }
 
-/** Affichage lisible d'un raccourci : "Alt+Space" -> "Alt+Espace". */
+/** Affichage lisible d'un raccourci : "Alt+Space" -> "Alt+Espace" (ou "Alt+Space" en anglais). */
 export function formatHotkey(accel) {
-  const names = { Space: "Espace", Escape: "Échap", Enter: "Entrée", Delete: "Suppr", Backspace: "Retour" };
-  return (accel || "").split("+").map((p) => names[p] || p).join("+");
+  return (accel || "").split("+").map((p) => {
+    const v = dict.keyNames?.[p];
+    return typeof v === "string" ? v : p;
+  }).join("+");
 }

@@ -2,7 +2,7 @@
 
 Lanette rassemble vos programmes (.exe), raccourcis (.lnk, .url Steam/Epic), dossiers, fichiers et liens web dans une seule fenêtre. Elle s'ouvre avec **Alt+Espace** depuis n'importe où, trouve ce que vous tapez instantanément, et lance l'élément avec **Entrée**.
 
-100 % local : aucune télémétrie, aucune connexion réseau.
+100 % local : aucune télémétrie. Lanette ne se connecte à Internet que si vous cliquez sur « Vérifier les mises à jour ».
 
 ---
 
@@ -147,7 +147,13 @@ Remplacez `app-icon.png` (1024×1024), puis lancez `npm run tauri icon app-icon.
 1. Créez un dépôt GitHub (privé ou public) et envoyez-y le projet.
 2. Le workflow `.github/workflows/build-windows.yml` compile Lanette à chaque push sur une machine Windows de GitHub. Il vérifie aussi que l'exe et l'installeur font moins de 15 Mo.
 3. Récupérez les fichiers dans l'onglet **Actions**, puis le dernier « Build Windows », puis **Artifacts** : l'installeur et `Lanette-portable.zip`.
-4. Pour publier une version : `git tag v1.0.0` puis `git push --tags`. Une **Release** est créée avec les fichiers.
+4. **Publier une mise à jour** : augmentez le numéro de version (`version` dans `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` et `package.json`), puis fusionnez dans `main`. Le workflow crée alors automatiquement la Release GitHub `vX.Y.Z`, avec l'installeur et la version portable.
+
+## Mises à jour depuis l'application
+
+Dans **Paramètres**, section **À propos**, cliquez sur **Vérifier les mises à jour**. Le menu de l'icône de notification propose le même bouton. Lanette demande d'abord l'autorisation de se connecter à GitHub : elle ne se connecte jamais à Internet sans votre accord. Elle compare ensuite sa version à la dernière Release du dépôt. Si une version plus récente existe, elle affiche les nouveautés et un bouton **Télécharger et installer**. L'installeur est téléchargé, lancé en mode automatique, puis Lanette redémarre. Vos éléments et réglages sont conservés.
+
+Ce bouton ne fonctionne que si le dépôt GitHub est **public** : un dépôt privé est invisible sans compte.
 
 ---
 
@@ -157,8 +163,9 @@ Remplacez `app-icon.png` (1024×1024), puis lancez `npm run tauri icon app-icon.
 |---|---|
 | Afficher / masquer Lanette | **Alt+Espace** (modifiable) ou clic sur l'icône de notification |
 | Rechercher | tapez directement (la recherche est active dès l'ouverture) |
-| Lancer | **Entrée** ou clic |
-| Lancer en administrateur | **Ctrl+Entrée**, clic molette ou menu contextuel |
+| Sélectionner | clic |
+| Lancer | **Entrée** ou double-clic |
+| Lancer en administrateur | **Ctrl+Entrée**, Ctrl+double-clic ou menu contextuel |
 | Ouvrir l'emplacement | **Maj+Entrée** |
 | Se déplacer | **flèches**, Origine/Fin, Page préc./suiv. |
 | Ajouter | **Ctrl+N**, bouton Ajouter, glisser-déposer, ou coller un lien / chemin dans la recherche |
@@ -171,6 +178,7 @@ Remplacez `app-icon.png` (1024×1024), puis lancez `npm run tauri icon app-icon.
 | Effacer la recherche / masquer | **Échap** |
 
 - **Réorganiser** : glissez une tuile au sein de sa section. Déposez-la sur un onglet pour la changer de groupe.
+- **Ajouter par clic droit** : sur un onglet (ajoute dans ce groupe), sur « Tout » ou dans le vide de la liste.
 - **Groupes** : bouton **+** à droite des onglets. Clic droit sur un onglet pour le renommer, le déplacer ou le supprimer.
 - **Élément grisé** : son chemin n'existe plus. Cliquez dessus pour corriger le chemin ou le retirer.
 - **Fermer la fenêtre** la masque seulement. Pour quitter : clic droit sur l'icône de notification, puis **Quitter**.
@@ -210,7 +218,9 @@ Note honnête sur la RAM : le processus `lanette.exe` lui-même reste léger (de
 - **Installeur NSIS par utilisateur** : pas besoin de droits administrateur pour installer.
 - **Fermer = masquer** dans la zone de notification. Quitter se fait par le menu de l'icône ou depuis les Paramètres.
 - **Résultats de recherche toujours en liste** (avec le chemin), même en vue grille : plus lisible et plus rapide au clavier.
-- **Clic simple = lancer** (comme un lanceur). Clic droit = menu.
+- **Clic = sélectionner, double-clic = lancer** (comme dans l'Explorateur). Clic droit = sélection + menu.
+- **Chemins masqués par défaut** (bouton « Masquer les chemins » en haut à droite).
+- **Réduire (—)** garde Lanette dans la barre des tâches. **Fermer (×)** la range dans la zone de notification.
 - **Récents** : les 8 derniers lancés, dans l'onglet « Tout ». Les favoris apparaissent en tête de « Tout » et en tête de leur groupe.
 - **Liens web** : pas de favicon téléchargé (respect du 100 % local). À la place, une pastille colorée avec l'initiale.
 - **Mica sous Windows 11 uniquement**. Windows 10 a un fond opaque : son effet Acrylic rend le déplacement de fenêtre saccadé.
@@ -222,7 +232,7 @@ Note honnête sur la RAM : le processus `lanette.exe` lui-même reste léger (de
 
 ## 9. Pistes d'amélioration
 
-1. **Mise à jour automatique** signée (plugin `tauri-plugin-updater` avec les Releases GitHub).
+1. **Vérification des mises à jour au démarrage** (optionnelle), et **signature de l'installeur** pour vérifier son authenticité.
 2. **Recherche étendue** optionnelle : fichiers récents de Windows, paramètres système (`ms-settings:`), calculatrice dans la barre de recherche.
 3. **Profils et lancement groupé** : un clic lance un ensemble (ex. « Session jeu » = Discord + Steam + OBS), avec un délai entre chaque programme.
 4. **Statistiques et tri intelligent** : temps de jeu par programme (en suivant le processus lancé), tri automatique par fréquence et heure d'utilisation.

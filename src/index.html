@@ -44,6 +44,11 @@
         </div>
         <div id="view-toggle" class="toolbar-seg"></div>
         <div id="size-toggle" class="toolbar-seg"></div>
+        <button class="toggle-btn" id="btn-paths" type="button" aria-pressed="true" data-i18n-title="toolbar.hidePaths">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12s3-6 8.5-6 8.5 6 8.5 6-3 6-8.5 6-8.5-6-8.5-6zM12 9.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM4 4l16 16"/></svg>
+          <span data-i18n="toolbar.paths">Chemins</span>
+          <span class="toggle-check" aria-hidden="true"></span>
+        </button>
         <button class="btn primary" id="btn-add" type="button" data-i18n-title="toolbar.addTitle">
           <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           <span data-i18n="toolbar.add">Ajouter</span>
@@ -54,13 +59,6 @@
 
       <main class="content" id="content" role="listbox" tabindex="-1"></main>
 
-      <footer class="statusbar" aria-hidden="true">
-        <span><kbd>↵</kbd> <span data-i18n="hints.launch">Lancer</span></span>
-        <span><kbd>Ctrl</kbd><kbd>↵</kbd> <span data-i18n="hints.admin">Admin</span></span>
-        <span><kbd>Maj</kbd><kbd>↵</kbd> <span data-i18n="hints.location">Emplacement</span></span>
-        <span><kbd>Suppr</kbd> <span data-i18n="hints.remove">Retirer</span></span>
-        <span><kbd>Échap</kbd> <span data-i18n="hints.hide">Masquer</span></span>
-      </footer>
     </div>
 
     <div class="drop-overlay" id="drop-overlay" aria-hidden="true">

@@ -96,7 +96,11 @@ pub fn on_blur(app: &AppHandle) {
             return;
         }
         let Some(w) = main_window(&app) else { return };
-        if !w.is_visible().unwrap_or(false) || w.is_focused().unwrap_or(false) {
+        // Réduite dans la barre des tâches : elle doit y rester.
+        if !w.is_visible().unwrap_or(false)
+            || w.is_minimized().unwrap_or(false)
+            || w.is_focused().unwrap_or(false)
+        {
             return;
         }
         if cursor_inside(&w) {

@@ -13,7 +13,7 @@ export default {
   },
 
   toolbar: {
-    search: "Rechercher une application, un fichier, un lien…",
+    search: "Rechercher…",
     add: "Ajouter",
     addTitle: "Ajouter des éléments (Ctrl+N)",
     grid: "Grille",
@@ -21,6 +21,8 @@ export default {
     sizeS: "Petites icônes",
     sizeM: "Icônes moyennes",
     sizeL: "Grandes icônes",
+    paths: "Masquer les chemins",
+    hidePaths: "Masquer les chemins d'accès dans toute l'application",
   },
 
   tabs: {
@@ -44,14 +46,6 @@ export default {
     none: "Aucun résultat pour « {q} »",
     addUrl: "Ajouter le lien « {q} »",
     addPath: "Ajouter « {q} »",
-  },
-
-  hints: {
-    launch: "Lancer",
-    admin: "Admin",
-    location: "Emplacement",
-    remove: "Retirer",
-    hide: "Masquer",
   },
 
   empty: {
@@ -79,6 +73,12 @@ export default {
     edit: "Modifier…",
     remove: "Retirer d'Lanette",
     fix: "Corriger le chemin…",
+    addHere: "Ajouter dans « {group} »",
+    addFiles: "Ajouter un jeu, un programme ou un fichier…",
+    addFolder: "Ajouter un dossier…",
+    addUrl: "Ajouter un lien web…",
+    addStartMenu: "Importer depuis le menu Démarrer…",
+    newGroup: "Nouveau groupe…",
   },
 
   add: {
@@ -124,6 +124,7 @@ export default {
     admin: "Toujours lancer en administrateur",
     startup: "Lancer automatiquement au démarrage d'Lanette",
     pinned: "Épinglé dans les favoris",
+    masked: "Chemin masqué. Décochez « Masquer les chemins » pour l'afficher.",
     icon: "Changer l'icône…",
     iconReset: "Icône d'origine",
     kind: {
@@ -162,6 +163,8 @@ export default {
     hideOnBlur: "Masquer quand on clique ailleurs",
     hideAfterLaunch: "Masquer après avoir lancé un élément",
     showRecents: "Afficher la section Récents",
+    hidePaths: "Masquer les chemins d'accès",
+    hidePathsSub: "Aucun chemin n'est affiché dans l'application",
     autostart: "Lancer avec Windows",
     autostartSub: "Lanette démarre discrètement dans la zone de notification",
     language: "Langue",
@@ -174,9 +177,34 @@ export default {
     portableOff: "Mode portable : posez un fichier nommé « portable » à côté de Lanette.exe.",
     dataDir: "Emplacement : {dir}",
     about: "À propos",
-    version: "Lanette {v} · 100 % local, aucune connexion réseau",
+    version: "Lanette {v} · 100 % local (Internet seulement pour vérifier les mises à jour, avec votre accord)",
     shortcuts: "Raccourcis clavier",
     quit: "Quitter Lanette",
+    checkUpdate: "Vérifier les mises à jour",
+  },
+
+  update: {
+    title: "Mises à jour",
+    consent: "Pour chercher une nouvelle version, Lanette va se connecter à GitHub (github.com). Aucune donnée personnelle n'est envoyée, et Lanette ne se connecte jamais à Internet sans votre accord.",
+    remember: "Ne plus me demander",
+    check: "Vérifier",
+    checking: "Recherche d'une nouvelle version…",
+    upToDate: "Lanette est à jour (version {v}).",
+    available: "La version {v} est disponible (vous avez la {current}).",
+    notes: "Nouveautés",
+    install: "Télécharger et installer",
+    later: "Plus tard",
+    downloading: "Téléchargement… {p} %",
+    installing: "Installation… Lanette va se fermer puis redémarrer toute seule.",
+    openPage: "Ouvrir la page GitHub",
+    retry: "Réessayer",
+    errors: {
+      not_found: "Aucune version publiée n'a été trouvée sur GitHub. Le dépôt est peut-être privé.",
+      network: "Impossible de joindre GitHub. Vérifiez votre connexion Internet. ({message})",
+      no_asset: "La version {message} est publiée, mais son installeur est introuvable.",
+      download: "Le téléchargement a échoué. ({message})",
+      install: "Impossible de lancer l'installeur. ({message})",
+    },
   },
 
   keys: {

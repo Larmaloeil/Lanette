@@ -33,6 +33,10 @@ pub struct Settings {
     pub hide_on_blur: bool,
     pub hide_after_launch: bool,
     pub show_recents: bool,
+    /// Masque les chemins d'accès partout dans l'interface.
+    pub hide_paths: bool,
+    /// L'utilisateur a accepté que Lanette contacte GitHub pour les mises à jour.
+    pub update_consent: bool,
     pub language: String,
     pub onboarded: bool,
 }
@@ -48,6 +52,8 @@ impl Default for Settings {
             hide_on_blur: true,
             hide_after_launch: true,
             show_recents: true,
+            hide_paths: true,
+            update_consent: false,
             language: "fr".into(),
             onboarded: false,
         }

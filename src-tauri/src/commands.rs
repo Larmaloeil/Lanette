@@ -4,6 +4,7 @@
 use crate::config::{self, Config};
 use crate::launcher::{self, LaunchError, LaunchRequest, NewItem, PathCheck};
 use crate::startmenu::{self, Candidate};
+use crate::updater::{self, UpdateError, UpdateInfo};
 use crate::{icons, tray, winutil, AppState};
 use serde::Serialize;
 use std::sync::atomic::Ordering;
@@ -267,4 +268,19 @@ pub async fn open_data_dir() -> Result<(), String> {
         .map_err(|e| e.message)
     })
     .await?
+}
+
+#[tauri::command]
+pub async fn check_update(app: AppHandle) -> Result<UpdateInfo, UpdateError> {
+    let current = app.package_info().version.to_string();
+    blocking(move || updater::check(&current))
+        .await
+        .map_err(|e| UpdateError { code: "network".into(), message: e })?
+}
+
+#[tauri::command]
+pub async fn install_update(app: AppHandle, url: String, size: u64, version: String) -> Result<(), UpdateError> {
+    blocking(move || updater::download_and_install(&app, &url, size, &version))
+        .await
+        .map_err(|e| UpdateError { code: "download".into(), message: e })?
 }

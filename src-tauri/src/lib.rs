@@ -7,6 +7,7 @@
 //! - `startmenu` : import du menu Démarrer et des applis du Store
 //! - `winutil`   : fenêtre (affichage instantané, multi-écrans, Mica, mémoire)
 //! - `tray`      : zone de notification
+//! - `updater`   : mises à jour depuis les Releases GitHub (sur demande)
 //! - `commands`  : API exposée au frontend
 
 mod commands;
@@ -16,6 +17,7 @@ mod launcher;
 mod shell;
 mod startmenu;
 mod tray;
+mod updater;
 mod winutil;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -161,6 +163,8 @@ pub fn run() {
             commands::set_autostart,
             commands::clear_icon_cache,
             commands::open_data_dir,
+            commands::check_update,
+            commands::install_update,
         ])
         .run(tauri::generate_context!())
         .expect("impossible de démarrer Lanette");

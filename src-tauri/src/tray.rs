@@ -7,10 +7,10 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_autostart::ManagerExt;
 
 /// Libellés du menu (le reste de l'interface est traduit côté frontend).
-fn labels(lang: &str) -> [&'static str; 4] {
+fn labels(lang: &str) -> [&'static str; 5] {
     match lang {
-        "en" => ["Open Lanette", "Settings", "Start with Windows", "Quit"],
-        _ => ["Ouvrir Lanette", "Paramètres", "Lancer avec Windows", "Quitter"],
+        "en" => ["Open Lanette", "Settings", "Start with Windows", "Quit", "Check for updates"],
+        _ => ["Ouvrir Lanette", "Paramètres", "Lancer avec Windows", "Quitter", "Vérifier les mises à jour"],
     }
 }
 
@@ -21,16 +21,17 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         .lock()
         .map(|c| c.settings.language.clone())
         .unwrap_or_default();
-    let [open, settings, autostart, quit] = labels(&lang);
+    let [open, settings, autostart, quit, update] = labels(&lang);
     let auto_on = app.autolaunch().is_enabled().unwrap_or(false);
 
     let open_i = MenuItem::with_id(app, "open", open, true, None::<&str>)?;
     let settings_i = MenuItem::with_id(app, "settings", settings, true, None::<&str>)?;
     let auto_i = CheckMenuItem::with_id(app, "autostart", autostart, true, auto_on, None::<&str>)?;
+    let update_i = MenuItem::with_id(app, "update", update, true, None::<&str>)?;
     let quit_i = MenuItem::with_id(app, "quit", quit, true, None::<&str>)?;
     let sep1 = PredefinedMenuItem::separator(app)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(app, &[&open_i, &settings_i, &sep1, &auto_i, &sep2, &quit_i])?;
+    let menu = Menu::with_items(app, &[&open_i, &settings_i, &update_i, &sep1, &auto_i, &sep2, &quit_i])?;
 
     if let Ok(mut slot) = app.state::<AppState>().autostart_item.lock() {
         *slot = Some(auto_i.clone());
@@ -45,6 +46,10 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
             "settings" => {
                 winutil::show_main(app);
                 let _ = app.emit("lanette://open-settings", ());
+            }
+            "update" => {
+                winutil::show_main(app);
+                let _ = app.emit("lanette://check-update", ());
             }
             "autostart" => {
                 let enabled = app.autolaunch().is_enabled().unwrap_or(false);

@@ -1,5 +1,5 @@
 // Fenêtres : ajout, import du menu Démarrer, modification, élément introuvable, paramètres.
-import { invoke, iconUrl } from "./api.js";
+import { invoke, iconUrl, listen } from "./api.js";
 import { t, formatHotkey, LOCALES } from "./i18n.js";
 import { state, settings, save, addItems, findGroup, removeItem } from "./store.js";
 import { h, icon, openModal, toast, toggle, segmented } from "./ui.js";
@@ -66,8 +66,22 @@ export async function pickAndAdd(kind, groupId = currentGroup()) {
 }
 
 // ---------------------------------------------------------------------------
-export function openAddDialog() {
-  const group = groupSelect(currentGroup());
+/** Petite fenêtre pour ajouter un lien web dans un groupe précis. */
+export function promptUrl(groupId = currentGroup()) {
+  const urlInput = h("input", { class: "input", type: "text", placeholder: t("add.urlPlaceholder"), spellcheck: "false", autofocus: true });
+  const nameInput = h("input", { class: "input", type: "text", placeholder: t("add.urlName"), spellcheck: "false" });
+  openModal({
+    title: t("add.url"),
+    body: h("div", { class: "url-prompt" }, urlInput, h("div", { style: { height: "8px" } }), nameInput),
+    actions: [
+      { label: t("common.cancel") },
+      { label: t("add.urlAdd"), kind: "primary", onClick: () => (addUrl(urlInput.value, nameInput.value, groupId).length ? undefined : (urlInput.focus(), false)) },
+    ],
+  });
+}
+
+export function openAddDialog(groupId = currentGroup()) {
+  const group = groupSelect(groupId);
   const urlInput = h("input", { class: "input", type: "text", placeholder: t("add.urlPlaceholder"), spellcheck: "false" });
   const nameInput = h("input", { class: "input", type: "text", placeholder: t("add.urlName"), spellcheck: "false" });
   const urlForm = h(
@@ -228,9 +242,17 @@ export function openEditDialog(item) {
 
   const field = (label, input, extra) => h("label", { class: "field" }, h("span", { text: label }), extra ? h("div", { class: "field-row" }, input, extra) : input);
   const name = h("input", { class: "input", type: "text", value: draft.name, autofocus: true, maxlength: "200" });
-  const target = h("input", { class: "input", type: "text", value: draft.target, spellcheck: "false" });
+  // Chemins masqués : les champs affichent des points (le bouton Parcourir reste utilisable).
+  const masked = !!settings().hidePaths;
+  const pathCls = masked ? "input masked" : "input";
+  const target = h("input", { class: pathCls, type: "text", value: draft.target, spellcheck: "false", autocomplete: "off" });
   const args = h("input", { class: "input", type: "text", value: draft.args || "", placeholder: t("edit.argsPlaceholder"), spellcheck: "false" });
-  const workdir = h("input", { class: "input", type: "text", value: draft.workdir || "", placeholder: t("edit.workdirPlaceholder"), spellcheck: "false" });
+  const workdir = h("input", { class: pathCls, type: "text", value: draft.workdir || "", placeholder: t("edit.workdirPlaceholder"), spellcheck: "false", autocomplete: "off" });
+  if (masked) for (const el of [target, workdir]) {
+    // Empêche de copier un chemin masqué.
+    el.addEventListener("copy", (e) => e.preventDefault());
+    el.addEventListener("cut", (e) => e.preventDefault());
+  }
   const group = groupSelect(draft.groupId);
   const isProgram = ["exe", "lnk"].includes(draft.kind);
   const browseBtn = (kind, input) =>
@@ -267,6 +289,7 @@ export function openEditDialog(item) {
     draft.kind === "app" ? null : field(t("edit.target"), target, draft.kind === "url" ? null : browseBtn(draft.kind === "folder" ? "workdir" : "target", target)),
     isProgram ? field(t("edit.args"), args) : null,
     isProgram ? field(t("edit.workdir"), workdir, browseBtn("workdir", workdir)) : null,
+    masked && draft.kind !== "app" ? h("p", { class: "masked-note", text: t("edit.masked") }) : null,
     field(t("edit.group"), group),
     h(
       "div",
@@ -326,7 +349,7 @@ export function deleteWithUndo(item) {
 export function openBrokenDialog(item) {
   openModal({
     title: t("broken.title"),
-    body: h("div", { class: "broken-dialog" }, h("div", { class: "broken-ico" }, icon("warning")), h("p", { text: t("broken.text", { name: item.name }) }), h("code", { class: "path", text: item.target })),
+    body: h("div", { class: "broken-dialog" }, h("div", { class: "broken-ico" }, icon("warning")), h("p", { text: t("broken.text", { name: item.name }) }), settings().hidePaths ? null : h("code", { class: "path", text: item.target })),
     actions: [
       { label: t("broken.remove"), kind: "danger", left: true, onClick: () => deleteWithUndo(item) },
       { label: t("menu.edit"), onClick: () => setTimeout(() => openEditDialog(item), 160) },
@@ -445,7 +468,7 @@ export function openSettings() {
   const lang = h("select", { class: "input small", onchange: (e) => change((v) => (s.language = v))(e.target.value) }, ...Object.entries(LOCALES).map(([code, d]) => h("option", { value: code, text: d._name, selected: code === s.language })));
 
   const shortcuts = [
-    ["↑ ↓ ← →", "keys.nav"], ["Entrée", "keys.launch"], ["Ctrl+Entrée", "keys.admin"], ["Maj+Entrée", "keys.location"],
+    ["↑ ↓ ← →", "keys.nav"], ["Entrée", "keys.launch"], ["Double-clic", "keys.launch"], ["Ctrl+Entrée", "keys.admin"], ["Maj+Entrée", "keys.location"],
     ["Ctrl+N", "keys.add"], ["Suppr", "keys.remove"], ["F2", "keys.rename"], ["Ctrl+D", "keys.pin"], ["Maj+F10", "keys.menu"],
     ["Ctrl+Tab", "keys.tabs"], ["Ctrl+F", "keys.search"], ["Ctrl+,", "keys.settings"], ["Échap", "keys.hide"],
   ];
@@ -473,6 +496,7 @@ export function openSettings() {
     toggle(t("settings.hideOnBlur"), s.hideOnBlur, change((v) => (s.hideOnBlur = v))),
     toggle(t("settings.hideAfterLaunch"), s.hideAfterLaunch, change((v) => (s.hideAfterLaunch = v))),
     toggle(t("settings.showRecents"), s.showRecents, change((v) => (s.showRecents = v))),
+    toggle(t("settings.hidePaths"), !!s.hidePaths, change((v) => (s.hidePaths = v)), t("settings.hidePathsSub")),
     autostart,
 
     h("h4", { text: t("settings.data") }),
@@ -511,13 +535,17 @@ export function openSettings() {
       } }, icon("trash"), h("span", { text: t("settings.clearCache") }))
     ),
     h("p", { class: "muted small", text: env.portable ? t("settings.portable") : t("settings.portableOff") }),
-    h("p", { class: "muted small path", text: t("settings.dataDir", { dir: env.dataDir || "" }) }),
+    s.hidePaths ? null : h("p", { class: "muted small path", text: t("settings.dataDir", { dir: env.dataDir || "" }) }),
 
     h("h4", { text: t("settings.shortcuts") }),
     h("div", { class: "shortcuts" }, ...shortcuts.map(([k, label]) => h("div", { class: "shortcut" }, h("kbd", { text: k }), h("span", { text: t(label) })))),
 
     h("h4", { text: t("settings.about") }),
     h("p", { class: "muted small", text: t("settings.version", { v: env.version || "" }) }),
+    h("button", { class: "btn", type: "button", onclick: () => {
+      modal.close();
+      setTimeout(openUpdateDialog, 150);
+    } }, icon("download"), h("span", { text: t("settings.checkUpdate") })),
     h("button", { class: "btn danger-subtle", type: "button", onclick: async () => {
       await import("./store.js").then((m) => m.flushSave());
       invoke("quit_app");
@@ -532,4 +560,102 @@ export function syncAutostart(enabled) {
   state.env.autostart = enabled;
   const input = document.querySelector(".autostart-toggle input");
   if (input) input.checked = enabled;
+}
+
+// ---------------------------------------------------------------------------
+// Mises à jour (GitHub Releases), uniquement à la demande de l'utilisateur.
+export function openUpdateDialog() {
+  if (document.querySelector(".modal.update")) return;
+  const s = settings();
+  const body = h("div", { class: "update-body" });
+  const modal = openModal({ title: t("update.title"), body, className: "update" });
+  const actions = h("footer", { class: "modal-actions" });
+  modal.dialog.append(actions);
+  let unlisten = null;
+  const prevClose = modal.close;
+  modal.close = () => {
+    unlisten?.();
+    prevClose();
+  };
+
+  const setActions = (list) =>
+    actions.replaceChildren(...list.map((a) => h("button", { class: `btn ${a.kind || ""}`, type: "button", text: a.label, onclick: a.onClick })));
+  const status = (ico, text, cls = "") =>
+    h("div", { class: `update-status ${cls}` }, h("span", { class: "ico-badge" }, ico === "spinner" ? h("span", { class: "spinner" }) : icon(ico)), h("p", { text }));
+  const openPage = (url) =>
+    invoke("launch_item", { req: { kind: "url", target: url, args: "", workdir: "", admin: false } }).catch(() => {});
+  const releasesPage = "https://github.com/Larmaloeil/Lanette/releases";
+
+  function askConsent() {
+    const remember = h("input", { type: "checkbox" });
+    body.replaceChildren(status("globe", t("update.consent")), h("label", { class: "check-row" }, remember, h("span", { text: t("update.remember") })));
+    setActions([
+      { label: t("common.cancel"), onClick: () => modal.close() },
+      { label: t("update.check"), kind: "primary", onClick: () => {
+        if (remember.checked) {
+          s.updateConsent = true;
+          save();
+        }
+        check();
+      } },
+    ]);
+    actions.querySelector(".btn.primary")?.focus();
+  }
+
+  async function check() {
+    body.replaceChildren(status("spinner", t("update.checking")));
+    setActions([]);
+    try {
+      const info = await invoke("check_update");
+      if (!info.available) {
+        body.replaceChildren(status("check", t("update.upToDate", { v: info.current })));
+        setActions([{ label: t("common.close"), kind: "primary", onClick: () => modal.close() }]);
+        return;
+      }
+      body.replaceChildren(
+        status("download", t("update.available", { v: info.latest, current: info.current })),
+        info.notes ? h("div", {}, h("small", { class: "muted", text: t("update.notes") }), h("div", { class: "update-notes", text: info.notes })) : null
+      );
+      setActions([
+        { label: t("update.later"), onClick: () => modal.close() },
+        { label: t("update.install"), kind: "primary", onClick: () => install(info) },
+      ]);
+      actions.querySelector(".btn.primary")?.focus();
+    } catch (e) {
+      showError(e);
+    }
+  }
+
+  async function install(info) {
+    const label = h("p", { text: t("update.downloading", { p: 0 }) });
+    const bar = h("div", { class: "progress-bar" });
+    body.replaceChildren(label, h("div", { class: "progress" }, bar));
+    setActions([]);
+    unlisten = await listen("lanette://update-progress", (ev) => {
+      const { done, total } = ev.payload;
+      const ratio = total ? Math.min(done / total, 1) : 0;
+      bar.style.transform = `scaleX(${ratio})`;
+      label.textContent = t("update.downloading", { p: Math.round(ratio * 100) });
+    });
+    try {
+      await import("./store.js").then((m) => m.flushSave());
+      await invoke("install_update", { url: info.url, size: info.size, version: info.latest });
+      bar.style.transform = "scaleX(1)";
+      body.replaceChildren(status("spinner", t("update.installing")));
+    } catch (e) {
+      showError(e);
+    }
+  }
+
+  function showError(e) {
+    const code = e?.code || "network";
+    body.replaceChildren(status("warning", t(`update.errors.${code}`, { message: e?.message || String(e) }), "error"));
+    setActions([
+      { label: t("update.openPage"), onClick: () => openPage(releasesPage) },
+      { label: t("update.retry"), kind: "primary", onClick: () => check() },
+    ]);
+  }
+
+  if (s.updateConsent) check();
+  else askConsent();
 }

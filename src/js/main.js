@@ -3,7 +3,7 @@ import { invoke, listen, appWindow, webview } from "./api.js";
 import { t, setLanguage, applyStatic, formatHotkey } from "./i18n.js";
 import { state, settings, save, flushSave, findItem, findGroup, addItems, applySectionOrder, moveToGroup, addGroup, deleteGroup, moveGroup, checkBroken } from "./store.js";
 import { render, renderContent, renderTabs, moveIndicator, handlers, select, moveVertical, selectedEntry, looksLikeUrl, looksLikePath, logoSvg } from "./render.js";
-import { hooks, openAddDialog, openImportDialog, openEditDialog, openBrokenDialog, openSettings, deleteWithUndo, addUrl, pickAndAdd, syncAutostart } from "./dialogs.js";
+import { hooks, openAddDialog, openImportDialog, openEditDialog, openBrokenDialog, openSettings, deleteWithUndo, addUrl, pickAndAdd, promptUrl, syncAutostart, openUpdateDialog } from "./dialogs.js";
 import { enableReorder } from "./dnd.js";
 import { h, icon, openMenu, toast, prompt, confirmBox, closeTop, closeMenus, hasLayer, topLayer, segmented } from "./ui.js";
 
@@ -30,6 +30,7 @@ function applyAppearance() {
   root.style.setProperty("--on-accent", lum > 0.36 ? "#0b0b0b" : "#ffffff");
   invoke("set_window_theme", { theme: s.theme }).catch(() => {});
   document.querySelectorAll("[data-hotkey]").forEach((el) => (el.textContent = formatHotkey(s.hotkey)));
+  $("btn-paths").setAttribute("aria-pressed", String(!!s.hidePaths));
   renderToolbarToggles();
 }
 systemDark.addEventListener("change", () => settings().theme === "system" && applyAppearance());
@@ -192,11 +193,30 @@ function cycleTab(dir) {
   switchTab(ids[(i + dir + ids.length) % ids.length]);
 }
 
+/** Entrées « ajouter » d'un menu contextuel, pour un groupe donné (null = sans groupe). */
+function addEntries(groupId) {
+  const g = groupId ? findGroup(groupId) : null;
+  return [
+    g ? { header: t("menu.addHere", { group: g.name }) } : null,
+    { label: t("menu.addFiles"), icon: "file", onClick: () => pickAndAdd("files", groupId) },
+    { label: t("menu.addFolder"), icon: "folder", onClick: () => pickAndAdd("folder", groupId) },
+    { label: t("menu.addUrl"), icon: "globe", onClick: () => promptUrl(groupId) },
+    { label: t("menu.addStartMenu"), icon: "import", onClick: () => openImportDialog(groupId) },
+  ].filter(Boolean);
+}
+
+/** Clic droit sur l'onglet « Tout » ou dans le vide de la liste. */
+function addMenu(groupId, x, y) {
+  openMenu(x, y, [...addEntries(groupId), { sep: true }, { label: t("menu.newGroup"), icon: "plus", onClick: () => newGroup() }]);
+}
+
 function groupMenu(id, x, y) {
   const g = findGroup(id);
   if (!g) return;
   const idx = state.config.groups.indexOf(g);
   openMenu(x, y, [
+    ...addEntries(id),
+    { sep: true },
     { label: t("tabs.rename"), icon: "rename", onClick: async () => {
       const name = await prompt({ title: t("prompt.renameGroup"), value: g.name });
       if (name) {
@@ -229,7 +249,8 @@ tabsEl.addEventListener("click", (e) => {
 tabsEl.addEventListener("contextmenu", (e) => {
   e.preventDefault();
   const b = e.target.closest(".tab[data-group]");
-  if (b && b.dataset.group !== "all") groupMenu(b.dataset.group, e.clientX, e.clientY);
+  if (!b || b.dataset.group === "all") addMenu(null, e.clientX, e.clientY);
+  else groupMenu(b.dataset.group, e.clientX, e.clientY);
 });
 tabsEl.addEventListener("wheel", (e) => {
   if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
@@ -249,25 +270,28 @@ const dnd = enableReorder(content, {
   },
 });
 
+// Un clic sélectionne, un double-clic lance (comme dans l'Explorateur).
 content.addEventListener("click", (e) => {
   if (dnd.consumeClick()) return;
   const tile = e.target.closest(".tile");
   if (!tile) return;
+  select(Number(tile.dataset.idx), false);
+});
+content.addEventListener("dblclick", (e) => {
+  const tile = e.target.closest(".tile");
+  if (!tile) return;
   const i = Number(tile.dataset.idx);
   select(i, false);
-  activate(state.visible[i], { admin: e.ctrlKey && e.shiftKey ? true : undefined, location: e.shiftKey && !e.ctrlKey });
-});
-content.addEventListener("auxclick", (e) => {
-  // Clic molette : lancer en administrateur.
-  if (e.button !== 1) return;
-  const tile = e.target.closest(".tile[data-id]");
-  const it = tile && findItem(tile.dataset.id);
-  if (it && ["exe", "lnk"].includes(it.kind)) launch(it, { admin: true });
+  activate(state.visible[i], { admin: e.ctrlKey ? true : undefined, location: e.shiftKey && !e.ctrlKey });
 });
 content.addEventListener("contextmenu", (e) => {
   e.preventDefault();
   const tile = e.target.closest(".tile[data-id]");
-  if (!tile) return;
+  if (!tile) {
+    // Clic droit dans le vide : ajouter dans le groupe affiché.
+    if (!e.target.closest(".tile, .empty")) addMenu(state.tab !== "all" ? state.tab : null, e.clientX, e.clientY);
+    return;
+  }
   select(Number(tile.dataset.idx), false);
   const it = findItem(tile.dataset.id);
   if (it) itemMenu(it, e.clientX, e.clientY);
@@ -413,6 +437,12 @@ $("btn-close").addEventListener("click", () => invoke("hide_window"));
 $("btn-min").addEventListener("click", () => appWindow().minimize());
 $("btn-settings").addEventListener("click", () => openSettings());
 $("btn-add").addEventListener("click", () => openAddDialog());
+$("btn-paths").addEventListener("click", () => {
+  settings().hidePaths = !settings().hidePaths;
+  save();
+  applyAppearance();
+  renderContent();
+});
 $("brand-logo").append(logoSvg());
 
 // ---------------------------------------------------------------------------
@@ -503,6 +533,10 @@ async function boot() {
     openSettings();
   });
   await listen("lanette://autostart-changed", (e) => syncAutostart(!!e.payload));
+  await listen("lanette://check-update", () => {
+    while (topLayer()) closeTop();
+    openUpdateDialog();
+  });
 
   // La fenêtre n'est affichée qu'une fois l'interface prête (pas d'écran blanc).
   requestAnimationFrame(() => invoke("app_ready"));

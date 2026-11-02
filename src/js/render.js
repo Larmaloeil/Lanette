@@ -86,8 +86,9 @@ function iconEl(item, px) {
   return wrap;
 }
 
+/** Sous-titre en vue liste : le chemin, ou seulement le type si les chemins sont masqués. */
 function subtitle(item) {
-  if (item.kind === "app") return t("edit.kind.app");
+  if (item.kind === "app" || settings().hidePaths) return t(`edit.kind.${item.kind}`);
   return item.target + (item.args ? `  ${item.args}` : "");
 }
 

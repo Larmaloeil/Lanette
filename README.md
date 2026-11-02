@@ -34,7 +34,8 @@ lanette/
 │   ├── index.html
 │   ├── styles.css
 │   ├── locales/
-│   │   └── fr.js                 ← tous les textes (ajouter en.js, etc.)
+│   │   ├── fr.js                 ← tous les textes (langue par défaut)
+│   │   └── en.js                 ← traduction anglaise
 │   └── js/
 │       ├── main.js               ← démarrage, clavier, lancement, menus
 │       ├── render.js             ← onglets, grille/liste, sélection
@@ -59,6 +60,7 @@ lanette/
         ├── launcher.rs           ← lancement, UAC, chemins cassés
         ├── icons.rs              ← extraction + cache + protocole icon://
         ├── startmenu.rs          ← import menu Démarrer + Store
+        ├── watcher.rs            ← détection des applications nouvellement installées
         ├── shell.rs              ← COM, .lnk, variables %ENV%
         ├── tray.rs               ← zone de notification
         └── winutil.rs            ← fenêtre, multi-écrans, Mica, mémoire
@@ -181,6 +183,10 @@ Ce bouton ne fonctionne que si le dépôt GitHub est **public** : un dépôt pri
 - **Ajouter par clic droit** : sur un onglet (ajoute dans ce groupe), sur « Tout » ou dans le vide de la liste.
 - **Groupes** : bouton **+** à droite des onglets. Clic droit sur un onglet pour le renommer, le déplacer ou le supprimer.
 - **Élément grisé** : son chemin n'existe plus. Cliquez dessus pour corriger le chemin ou le retirer.
+- **Nouvelles applications** : quand vous installez un jeu ou un logiciel (raccourci dans le menu Démarrer ou sur le bureau, ou appli du Store), Lanette propose de l'ajouter. **Plus tard** le garde dans la liste **Pour plus tard** (bouton horloge en haut, avec le nombre en attente). Si Lanette était masquée, la proposition s'affiche à sa prochaine ouverture. Désactivable dans les paramètres.
+- **Replier une section** : dans « Tout », le petit chevron à droite du nom (ex. « Récents 2 ˄ ») replie ou déplie la section.
+- **Chemins masqués** : le bouton œil n'apparaît qu'en vue Liste (seule vue qui affiche les chemins). Masqués, ils sont remplacés par un faux chemin flouté « C:/Nom du groupe/... ».
+- **Langue** : Français par défaut, English dans **Paramètres > Langue**.
 - **« — » ou « × »** range la fenêtre dans la zone de notification. Cliquer ailleurs la laisse ouverte. Pour quitter : clic droit sur l'icône de notification, puis **Quitter**.
 
 ---

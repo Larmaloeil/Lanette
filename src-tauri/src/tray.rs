@@ -36,6 +36,9 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     if let Ok(mut slot) = app.state::<AppState>().autostart_item.lock() {
         *slot = Some(auto_i.clone());
     }
+    if let Ok(mut slot) = app.state::<AppState>().tray_items.lock() {
+        *slot = vec![open_i.clone(), settings_i.clone(), update_i.clone(), quit_i.clone()];
+    }
 
     let mut builder = TrayIconBuilder::with_id("lanette-tray")
         .tooltip("Lanette")
@@ -74,6 +77,36 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     }
     builder.build(app)?;
     Ok(())
+}
+
+/// Change la langue du menu sans le reconstruire.
+pub fn relabel(app: &AppHandle, lang: &str) {
+    let [open, settings, autostart, quit, update] = labels(lang);
+    let state = app.state::<AppState>();
+    if let Ok(items) = state.tray_items.lock() {
+        for (item, text) in items.iter().zip([open, settings, update, quit]) {
+            let _ = item.set_text(text);
+        }
+    };
+    if let Ok(slot) = state.autostart_item.lock() {
+        if let Some(item) = slot.as_ref() {
+            let _ = item.set_text(autostart);
+        }
+    };
+}
+
+/// Infobulle de l'icône : signale les applications détectées en attente.
+pub fn set_pending(app: &AppHandle, n: u32, lang: &str) {
+    let text = match (n, lang) {
+        (0, _) => "Lanette".to_string(),
+        (1, "en") => "Lanette · 1 new app detected".to_string(),
+        (_, "en") => format!("Lanette · {n} new apps detected"),
+        (1, _) => "Lanette · 1 nouvelle application détectée".to_string(),
+        _ => format!("Lanette · {n} nouvelles applications détectées"),
+    };
+    if let Some(tray) = app.tray_by_id("lanette-tray") {
+        let _ = tray.set_tooltip(Some(text));
+    }
 }
 
 pub fn set_autostart(app: &AppHandle, enabled: bool) -> Result<(), String> {

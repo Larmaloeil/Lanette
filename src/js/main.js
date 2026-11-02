@@ -1,9 +1,9 @@
 // Point d'entrée : démarrage, événements, clavier, lancement, menus.
 import { invoke, listen, webview } from "./api.js";
 import { t, setLanguage, applyStatic, formatHotkey } from "./i18n.js";
-import { state, settings, save, flushSave, findItem, findGroup, addItems, applySectionOrder, moveToGroup, addGroup, deleteGroup, moveGroup, checkBroken } from "./store.js";
+import { state, settings, save, flushSave, findItem, findGroup, addItems, applySectionOrder, moveToGroup, addGroup, deleteGroup, moveGroup, checkBroken, receiveDetected, freshLater } from "./store.js";
 import { render, renderContent, renderTabs, moveIndicator, handlers, select, moveVertical, selectedEntry, looksLikeUrl, looksLikePath, logoSvg } from "./render.js";
-import { hooks, openAddDialog, openImportDialog, openEditDialog, openBrokenDialog, openSettings, deleteWithUndo, addUrl, pickAndAdd, promptUrl, syncAutostart, openUpdateDialog } from "./dialogs.js";
+import { hooks, openAddDialog, openImportDialog, openEditDialog, openBrokenDialog, openSettings, deleteWithUndo, addUrl, pickAndAdd, promptUrl, syncAutostart, openUpdateDialog, openDetectedDialog, openLaterDialog } from "./dialogs.js";
 import { enableReorder } from "./dnd.js";
 import { h, icon, openMenu, toast, prompt, confirmBox, closeTop, closeMenus, hasLayer, topLayer, segmented } from "./ui.js";
 
@@ -32,6 +32,7 @@ function applyAppearance() {
   document.querySelectorAll("[data-hotkey]").forEach((el) => (el.textContent = formatHotkey(s.hotkey)));
   $("btn-paths").setAttribute("aria-pressed", String(!!s.hidePaths));
   renderToolbarToggles();
+  refreshLater();
 }
 systemDark.addEventListener("change", () => settings().theme === "system" && applyAppearance());
 
@@ -437,6 +438,7 @@ $("btn-close").addEventListener("click", () => invoke("hide_window"));
 // « — » range Lanette dans la zone de notification (elle quitte la barre des tâches).
 $("btn-min").addEventListener("click", () => invoke("hide_window"));
 $("btn-settings").addEventListener("click", () => openSettings());
+$("btn-later").addEventListener("click", () => openLaterDialog());
 $("btn-add").addEventListener("click", () => openAddDialog());
 $("btn-paths").addEventListener("click", () => {
   settings().hidePaths = !settings().hidePaths;
@@ -474,8 +476,39 @@ webview().onDragDropEvent(async (ev) => {
 });
 
 // ---------------------------------------------------------------------------
+// Applications nouvellement installées et liste « Pour plus tard »
+let windowShown = false;
+
+/** Pastille du bouton « Pour plus tard » et infobulle de l'icône de notification. */
+function refreshLater() {
+  const n = (state.config.later || []).length;
+  const fresh = freshLater().length;
+  const badge = $("later-badge");
+  badge.hidden = !n;
+  badge.textContent = n > 99 ? "99+" : String(n);
+  const btn = $("btn-later");
+  btn.title = n ? t("titlebar.laterCount", { n }) : t("titlebar.later");
+  btn.setAttribute("aria-label", btn.title);
+  invoke("set_pending", { count: fresh }).catch(() => {});
+}
+
+/** Propose les applications détectées, sans jamais interrompre une autre fenêtre. */
+function proposeDetected() {
+  if (!freshLater().length || !windowShown) return;
+  if (hasLayer()) {
+    toast(t("detect.toast", { n: freshLater().length }), { action: t("detect.show"), onAction: () => {
+      while (topLayer()) closeTop();
+      openDetectedDialog();
+    } });
+    return;
+  }
+  openDetectedDialog();
+}
+
+// ---------------------------------------------------------------------------
 // Affichage / masquage de la fenêtre
 function onShown() {
+  windowShown = true;
   closeMenus();
   document.getElementById("app").classList.remove("appear");
   void document.getElementById("app").offsetWidth;
@@ -489,6 +522,8 @@ function onShown() {
   }
   // Vérification des chemins en tâche de fond (limitée à une fois / 20 s).
   setTimeout(() => checkBroken().then((changed) => changed && renderContent()), 120);
+  // Applications installées pendant que Lanette était masquée.
+  setTimeout(proposeDetected, 260);
 }
 
 // Changement d'écran avec une autre densité de pixels : icônes à la bonne taille.
@@ -516,16 +551,19 @@ async function boot() {
   hooks.render = render;
   hooks.applyAppearance = applyAppearance;
   hooks.afterAdd = afterAdd;
+  hooks.refreshLater = refreshLater;
   handlers.importStartMenu = () => openImportDialog();
   handlers.addFiles = () => openAddDialog();
 
   applyAppearance();
   render();
+  refreshLater();
   searchEl.focus();
   watchDpr();
 
   await listen("lanette://shown", onShown);
   await listen("lanette://hidden", () => {
+    windowShown = false;
     closeMenus();
     flushSave();
   });
@@ -534,6 +572,11 @@ async function boot() {
     openSettings();
   });
   await listen("lanette://autostart-changed", (e) => syncAutostart(!!e.payload));
+  await listen("lanette://new-apps", (e) => {
+    if (!receiveDetected(e.payload).length) return;
+    refreshLater();
+    proposeDetected();
+  });
   await listen("lanette://check-update", () => {
     while (topLayer()) closeTop();
     openUpdateDialog();

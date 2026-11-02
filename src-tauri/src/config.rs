@@ -36,8 +36,13 @@ pub struct Settings {
     pub hide_paths: bool,
     /// L'utilisateur a accepté que Lanette contacte GitHub pour les mises à jour.
     pub update_consent: bool,
+    /// "fr" | "en"
     pub language: String,
     pub onboarded: bool,
+    /// Propose d'ajouter les applications installées après Lanette.
+    pub detect_new_apps: bool,
+    /// Sections repliées dans l'onglet « Tout » ("pinned", "recents", "g:<id>", "loose").
+    pub collapsed: Vec<String>,
 }
 
 impl Default for Settings {
@@ -54,6 +59,8 @@ impl Default for Settings {
             update_consent: false,
             language: "fr".into(),
             onboarded: false,
+            detect_new_apps: true,
+            collapsed: Vec::new(),
         }
     }
 }
@@ -86,6 +93,20 @@ pub struct Item {
     pub added_at: i64,
 }
 
+/// Application mise de côté dans la liste « Pour plus tard ».
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct LaterItem {
+    pub name: String,
+    pub kind: String,
+    pub target: String,
+    /// "startmenu" | "desktop" | "store"
+    pub source: String,
+    pub added_at: i64,
+    /// Détectée mais pas encore montrée à l'utilisateur.
+    pub fresh: bool,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Config {
@@ -93,6 +114,7 @@ pub struct Config {
     pub settings: Settings,
     pub groups: Vec<Group>,
     pub items: Vec<Item>,
+    pub later: Vec<LaterItem>,
 }
 
 impl Default for Config {
@@ -106,6 +128,7 @@ impl Default for Config {
                 Group { id: "g-outils".into(), name: "Outils".into() },
             ],
             items: Vec::new(),
+            later: Vec::new(),
         }
     }
 }
@@ -131,6 +154,10 @@ impl Config {
         if s.hotkey.trim().is_empty() {
             s.hotkey = Settings::default().hotkey;
         }
+        if !["fr", "en"].contains(&s.language.as_str()) {
+            s.language = "fr".into();
+        }
+        s.collapsed.truncate(200);
 
         let mut seen = std::collections::HashSet::new();
         self.groups.retain(|g| !g.id.is_empty() && seen.insert(g.id.clone()));
@@ -155,12 +182,21 @@ impl Config {
             }
         }
         self.items.retain(|it| !it.target.trim().is_empty());
+
+        let mut seen = std::collections::HashSet::new();
+        self.later.retain(|l| !l.target.trim().is_empty() && seen.insert(l.target.to_lowercase()));
+        self.later.truncate(500);
         self
     }
 }
 
 fn is_hex_color(s: &str) -> bool {
     s.len() == 7 && s.starts_with('#') && s[1..].chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// Langue de l'interface, pour les rares textes produits côté Rust.
+pub fn is_english(state: &crate::AppState) -> bool {
+    state.config.lock().map(|c| c.settings.language == "en").unwrap_or(false)
 }
 
 pub fn now_ms() -> i64 {

@@ -8,6 +8,7 @@
 //! - `winutil`   : fenêtre (affichage instantané, multi-écrans, Mica, mémoire)
 //! - `tray`      : zone de notification
 //! - `updater`   : mises à jour depuis les Releases GitHub (sur demande)
+//! - `watcher`   : détection des applications nouvellement installées
 //! - `commands`  : API exposée au frontend
 
 mod commands;
@@ -18,12 +19,13 @@ mod shell;
 mod startmenu;
 mod tray;
 mod updater;
+mod watcher;
 mod winutil;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use tauri::menu::CheckMenuItem;
+use tauri::menu::{CheckMenuItem, MenuItem};
 use tauri::{Manager, WindowEvent, Wry};
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
@@ -36,6 +38,7 @@ pub struct AppState {
     pub last_blur: Mutex<Option<Instant>>,
     pub last_blur_hide: Mutex<Option<Instant>>,
     pub autostart_item: Mutex<Option<CheckMenuItem<Wry>>>,
+    pub tray_items: Mutex<Vec<MenuItem<Wry>>>,
     pub start_hidden: bool,
     pub ready: AtomicBool,
     pub mica: AtomicBool,
@@ -73,6 +76,7 @@ pub fn run() {
             last_blur: Mutex::new(None),
             last_blur_hide: Mutex::new(None),
             autostart_item: Mutex::new(None),
+            tray_items: Mutex::new(Vec::new()),
             start_hidden,
             ready: AtomicBool::new(false),
             mica: AtomicBool::new(false),
@@ -90,6 +94,7 @@ pub fn run() {
             }
 
             tray::build(&handle)?;
+            watcher::start(handle.clone());
 
             if let Err(e) = commands::apply_hotkey(&handle, &settings.hotkey) {
                 if let Ok(mut slot) = state.hotkey_error.lock() {
@@ -165,6 +170,8 @@ pub fn run() {
             commands::open_data_dir,
             commands::check_update,
             commands::install_update,
+            commands::set_language,
+            commands::set_pending,
         ])
         .run(tauri::generate_context!())
         .expect("impossible de démarrer Lanette");

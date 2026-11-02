@@ -2,7 +2,7 @@
 import { iconUrl } from "./api.js";
 import { search } from "./fuzzy.js";
 import { t, formatHotkey } from "./i18n.js";
-import { state, settings, findGroup } from "./store.js";
+import { state, settings, save, findGroup } from "./store.js";
 import { h, icon } from "./ui.js";
 
 /** Actions branchées par main.js (évite les imports circulaires). */
@@ -86,10 +86,17 @@ function iconEl(item, px) {
   return wrap;
 }
 
-/** Sous-titre en vue liste : le chemin, ou seulement le type si les chemins sont masqués. */
+/**
+ * Sous-titre en vue liste : le chemin. Chemins masqués : un faux chemin flouté
+ * « C:/<groupe>/... » (le vrai n'est jamais dans la page, impossible à deviner).
+ */
 function subtitle(item) {
-  if (item.kind === "app" || settings().hidePaths) return t(`edit.kind.${item.kind}`);
-  return item.target + (item.args ? `  ${item.args}` : "");
+  if (item.kind === "app") return h("span", { class: "tile-sub", text: t(`edit.kind.${item.kind}`) });
+  if (settings().hidePaths) {
+    const g = item.groupId ? findGroup(item.groupId) : null;
+    return h("span", { class: "tile-sub masked-path", "aria-label": t("toolbar.pathHidden"), text: g ? `C:/${g.name}/...` : "C:/..." });
+  }
+  return h("span", { class: "tile-sub", text: item.target + (item.args ? `  ${item.args}` : "") });
 }
 
 function tileEl(item, list) {
@@ -112,7 +119,7 @@ function tileEl(item, list) {
       "div",
       { class: "tile-text" },
       h("span", { class: "tile-name", text: item.name }),
-      list ? h("span", { class: "tile-sub", text: subtitle(item) }) : null
+      list ? subtitle(item) : null
     ),
     h(
       "div",
@@ -126,17 +133,44 @@ function tileEl(item, list) {
   return el;
 }
 
-function section(key, title, items, { list, reorder, iconName, empty } = {}) {
+const isCollapsed = (key) => (settings().collapsed || []).includes(key);
+
+/** Replie / déplie une section de l'onglet « Tout » (mémorisé). */
+export function toggleCollapsed(key) {
+  const s = settings();
+  const set = new Set(s.collapsed || []);
+  set.has(key) ? set.delete(key) : set.add(key);
+  s.collapsed = [...set];
+  save();
+  renderContent();
+}
+
+function section(key, title, items, { list, reorder, iconName, empty, collapsible } = {}) {
+  const collapsed = collapsible && isCollapsed(key);
   const tiles = h("div", { class: "tiles", role: "group", "aria-label": title, dataset: { section: key, reorder: reorder ? "1" : "0" } });
-  for (const it of items) tiles.append(tileEl(it, list));
+  if (!collapsed) for (const it of items) tiles.append(tileEl(it, list));
   if (!items.length && empty) tiles.append(h("p", { class: "section-empty muted", text: empty }));
+  const fold = collapsible
+    ? h(
+        "button",
+        {
+          class: `fold-btn ${collapsed ? "collapsed" : ""}`,
+          type: "button",
+          title: collapsed ? t("sections.expand") : t("sections.collapse"),
+          "aria-label": `${collapsed ? t("sections.expand") : t("sections.collapse")} : ${title}`,
+          "aria-expanded": String(!collapsed),
+          onclick: () => toggleCollapsed(key),
+        },
+        icon("chevron")
+      )
+    : null;
   return h(
     "section",
-    { class: "section" },
+    { class: `section ${collapsed ? "collapsed" : ""}` },
     title
-      ? h("h3", { class: "section-title" }, iconName ? icon(iconName) : null, h("span", { text: title }), items.length ? h("span", { class: "count", text: items.length }) : null)
+      ? h("h3", { class: "section-title" }, iconName ? icon(iconName) : null, h("span", { text: title }), items.length ? h("span", { class: "count", text: items.length }) : null, fold)
       : null,
-    tiles
+    collapsed ? null : tiles
   );
 }
 
@@ -180,6 +214,9 @@ export function renderContent() {
   state.visible = [];
   const list = q ? true : s.view === "list";
   content.dataset.view = list ? "list" : "grid";
+  // Le bouton « masquer les chemins » n'apparaît que lorsque des chemins sont affichés.
+  const pathsBtn = document.getElementById("btn-paths");
+  if (pathsBtn) pathsBtn.hidden = !list || !items.length;
   content.dataset.size = s.iconSize;
 
   const frag = document.createDocumentFragment();
@@ -204,17 +241,17 @@ export function renderContent() {
     frag.append(sec);
   } else if (state.tab === "all") {
     const pinned = items.filter((i) => i.pinned);
-    if (pinned.length) frag.append(section("pinned", t("sections.favorites"), pinned, { list, reorder: true, iconName: "star" }));
+    if (pinned.length) frag.append(section("pinned", t("sections.favorites"), pinned, { list, reorder: true, iconName: "star", collapsible: true }));
     if (s.showRecents) {
       const recents = items.filter((i) => i.lastLaunched).sort((a, b) => b.lastLaunched - a.lastLaunched).slice(0, MAX_RECENTS);
-      if (recents.length) frag.append(section("recents", t("sections.recents"), recents, { list }));
+      if (recents.length) frag.append(section("recents", t("sections.recents"), recents, { list, collapsible: true }));
     }
     for (const g of state.config.groups) {
       const gi = items.filter((i) => i.groupId === g.id && !i.pinned);
-      if (gi.length) frag.append(section(`g:${g.id}`, g.name, gi, { list, reorder: true }));
+      if (gi.length) frag.append(section(`g:${g.id}`, g.name, gi, { list, reorder: true, collapsible: true }));
     }
     const loose = items.filter((i) => !i.groupId && !i.pinned);
-    if (loose.length) frag.append(section("loose", t("sections.ungrouped"), loose, { list, reorder: true }));
+    if (loose.length) frag.append(section("loose", t("sections.ungrouped"), loose, { list, reorder: true, collapsible: true }));
   } else {
     const g = findGroup(state.tab);
     const gi = items.filter((i) => i.groupId === state.tab);

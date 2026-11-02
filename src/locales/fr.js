@@ -10,6 +10,8 @@ export default {
     settings: "Paramètres (Ctrl+,)",
     minimize: "Réduire dans la zone de notification",
     close: "Masquer (Échap)",
+    later: "Pour plus tard",
+    laterCount: "Pour plus tard ({n})",
   },
 
   toolbar: {
@@ -22,6 +24,7 @@ export default {
     sizeM: "Icônes moyennes",
     sizeL: "Grandes icônes",
     hidePaths: "Masquer les chemins d'accès dans toute l'application",
+    pathHidden: "Chemin masqué",
   },
 
   tabs: {
@@ -38,6 +41,8 @@ export default {
     recents: "Récents",
     ungrouped: "Sans groupe",
     results: "Résultats",
+    collapse: "Replier",
+    expand: "Déplier",
     emptyGroup: "Ce groupe est vide. Glissez un élément sur son onglet ou déposez des fichiers ici.",
   },
 
@@ -70,7 +75,7 @@ export default {
     noGroup: "Sans groupe",
     rename: "Renommer",
     edit: "Modifier…",
-    remove: "Retirer d'Lanette",
+    remove: "Retirer de Lanette",
     fix: "Corriger le chemin…",
     addHere: "Ajouter dans « {group} »",
     addFiles: "Ajouter un jeu, un programme ou un fichier…",
@@ -121,7 +126,7 @@ export default {
     workdirPlaceholder: "Par défaut : dossier du programme",
     group: "Groupe",
     admin: "Toujours lancer en administrateur",
-    startup: "Lancer automatiquement au démarrage d'Lanette",
+    startup: "Lancer automatiquement au démarrage de Lanette",
     pinned: "Épinglé dans les favoris",
     masked: "Chemin masqué. Décochez « Masquer les chemins » pour l'afficher.",
     icon: "Changer l'icône…",
@@ -163,6 +168,8 @@ export default {
     showRecents: "Afficher la section Récents",
     hidePaths: "Masquer les chemins d'accès",
     hidePathsSub: "Aucun chemin n'est affiché dans l'application",
+    detectNew: "Détecter les nouvelles applications",
+    detectNewSub: "Propose d'ajouter les jeux et logiciels que vous installez",
     autostart: "Lancer avec Windows",
     autostartSub: "Lanette démarre discrètement dans la zone de notification",
     language: "Langue",
@@ -203,6 +210,34 @@ export default {
       download: "Le téléchargement a échoué. ({message})",
       install: "Impossible de lancer l'installeur. ({message})",
     },
+  },
+
+  detect: {
+    titleOne: "Nouvelle application détectée",
+    title: "{n} nouvelles applications détectées",
+    textOne: "« {name} » vient d'être installée. Voulez-vous l'ajouter à Lanette ?",
+    text: "Ces applications viennent d'être installées. Voulez-vous les ajouter à Lanette ?",
+    hint: "« Plus tard » les garde dans la liste Pour plus tard (bouton horloge en haut).",
+    add: "Ajouter ({n})",
+    later: "Plus tard",
+    ignore: "Ignorer",
+    toast: "{n} nouvelle(s) application(s) détectée(s)",
+    show: "Voir",
+    source: { startmenu: "Menu Démarrer", desktop: "Bureau", store: "Store" },
+  },
+
+  later: {
+    title: "Pour plus tard",
+    text: "Les applications détectées que vous avez mises de côté. Ajoutez-les quand vous voulez.",
+    empty: "Rien pour l'instant. Quand Lanette détecte une nouvelle application, « Plus tard » la garde ici.",
+    add: "Ajouter",
+    addAll: "Tout ajouter",
+    remove: "Retirer de la liste",
+  },
+
+  keyNames: {
+    Space: "Espace", Escape: "Échap", Enter: "Entrée", Delete: "Suppr", Backspace: "Retour",
+    Shift: "Maj", DoubleClick: "Double-clic",
   },
 
   keys: {

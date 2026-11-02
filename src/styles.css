@@ -239,7 +239,14 @@ html.mica .app { background: transparent; }
 .tab:hover::before { opacity: 1; }
 .tab > * { position: relative; }
 .tab.active { color: var(--text); font-weight: 600; }
-.tab-count { font-size: 11px; color: var(--text-3); font-weight: 400; }
+/* Compteur : pastille de hauteur fixe, centrée sur la ligne du nom */
+.tab-count {
+  display: inline-grid; place-items: center;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  font-size: 11px; line-height: 1; font-weight: 500; font-variant-numeric: tabular-nums;
+  color: var(--text-3); background: var(--layer-2); box-shadow: inset 0 0 0 1px var(--stroke);
+}
+.tab.active .tab-count { color: var(--accent); background: var(--accent-soft); box-shadow: none; }
 .tab-add { padding: 0 10px; }
 .tab.drop-target::before { opacity: 1; background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .tab-indicator {
@@ -276,7 +283,16 @@ html.mica .app { background: transparent; }
   color: var(--text-2); letter-spacing: 0.01em;
 }
 .section-title .ico { width: 14px; height: 14px; color: var(--accent); }
-.section-title .count { font-weight: 400; color: var(--text-3); }
+.section-title .count { font-weight: 400; color: var(--text-3); font-variant-numeric: tabular-nums; }
+/* Mini bouton pour replier / déplier une section */
+.fold-btn {
+  width: 22px; height: 22px; margin-left: -2px; display: grid; place-items: center;
+  border: 0; border-radius: 5px; background: transparent; color: var(--text-3);
+}
+.fold-btn:hover { background: var(--hover); color: var(--text); }
+.fold-btn .ico { width: 13px; height: 13px; color: inherit !important; transform: rotate(-90deg); transition: transform 160ms var(--ease); }
+.fold-btn.collapsed .ico { transform: rotate(90deg); }
+.section.collapsed .section-title { color: var(--text-3); }
 .section-empty { padding: 26px 8px; text-align: center; font-size: 13px; grid-column: 1 / -1; }
 
 .content[data-view="grid"] .tiles {
@@ -602,7 +618,8 @@ code.path { display: block; width: 100%; padding: 8px 10px; border-radius: 6px; 
 .shortcut { display: flex; align-items: center; gap: 10px; }
 .shortcut kbd { min-width: 82px; }
 .settings-body .btn-row { margin: 8px 0 10px; }
-.settings-body > .btn { margin-top: 10px; }
+.settings-body .about-actions { gap: 12px; align-items: center; margin-top: 4px; }
+.settings-body .about-actions .btn { height: 34px; }
 
 /* ------------------------------------------------------------------ */
 /* Menus contextuels */
@@ -697,3 +714,31 @@ code.path { display: block; width: 100%; padding: 8px 10px; border-radius: 6px; 
 .progress-bar { height: 100%; width: 100%; background: var(--accent); transform-origin: 0 50%; transform: scaleX(0); transition: transform 120ms linear; }
 .check-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
 .check-row input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+
+/* Chemin masqué en vue liste : faux chemin flouté */
+.tile-sub.masked-path { filter: blur(2.5px); user-select: none; pointer-events: none; }
+.icon-toggle[hidden] { display: none; }
+
+/* Bouton « Pour plus tard » de la barre de titre et sa pastille */
+.tb-badge {
+  position: absolute; top: 6px; right: 8px;
+  min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px;
+  display: grid; place-items: center;
+  background: var(--accent); color: var(--on-accent);
+  font-size: 10px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
+}
+.tb-badge[hidden] { display: none; }
+
+/* Applications détectées / Pour plus tard */
+.detected-body, .later-body { display: flex; flex-direction: column; gap: 12px; }
+.detected-body p, .later-body p { margin: 0; }
+.detected-body .update-status p { color: var(--text-2); }
+.detected-list { margin-top: 0; height: auto; max-height: min(38vh, 260px); }
+.later-list { margin-top: 0; height: min(46vh, 340px); }
+.later-row { grid-template-columns: 26px 1fr auto auto auto; }
+.btn.small { height: 28px; padding: 0 10px; font-size: 12.5px; gap: 5px; }
+.btn.small .ico { width: 14px; height: 14px; }
+.later-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 20px; }
+.later-empty .ico-badge { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.later-empty .ico-badge .ico { width: 22px; height: 22px; }
+.later-empty p { max-width: 360px; font-size: 13px; }

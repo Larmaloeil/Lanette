@@ -1,7 +1,7 @@
 // Fenêtres : ajout, import du menu Démarrer, modification, élément introuvable, paramètres.
 import { invoke, iconUrl, listen } from "./api.js";
 import { t, formatHotkey, LOCALES } from "./i18n.js";
-import { state, settings, save, addItems, findGroup, removeItem } from "./store.js";
+import { state, settings, save, addItems, findGroup, removeItem, freshLater, laterAdd, laterRemove, laterMarkSeen } from "./store.js";
 import { h, icon, openModal, toast, toggle, segmented } from "./ui.js";
 
 /** Branché par main.js : re-rendu, application du thème, etc. */
@@ -10,6 +10,7 @@ export const hooks = {
   applyAppearance: () => {},
   afterAdd: (_items) => {},
   launch: (_item, _opts) => {},
+  refreshLater: () => {},
 };
 
 const currentGroup = () => (state.tab !== "all" && findGroup(state.tab) ? state.tab : null);
@@ -465,12 +466,25 @@ export function openSettings() {
   }, t("settings.autostartSub"));
   autostart.classList.add("autostart-toggle");
 
-  const lang = h("select", { class: "input small", onchange: (e) => change((v) => (s.language = v))(e.target.value) }, ...Object.entries(LOCALES).map(([code, d]) => h("option", { value: code, text: d._name, selected: code === s.language })));
+  const lang = h("select", { class: "input small", onchange: (e) => {
+    change((v) => (s.language = v))(e.target.value);
+    invoke("set_language", { lang: s.language }).catch(() => {});
+    hooks.refreshLater();
+    // Rouvre les paramètres pour les afficher dans la nouvelle langue.
+    const top = modal.dialog.querySelector(".modal-body")?.scrollTop || 0;
+    modal.close();
+    setTimeout(() => {
+      openSettings();
+      const b = document.querySelector(".modal.settings .modal-body");
+      if (b) b.scrollTop = top;
+    }, 150);
+  } }, ...Object.entries(LOCALES).map(([code, d]) => h("option", { value: code, text: d._name, selected: code === s.language })));
 
+  const k = (name) => t(`keyNames.${name}`);
   const shortcuts = [
-    ["↑ ↓ ← →", "keys.nav"], ["Entrée", "keys.launch"], ["Double-clic", "keys.launch"], ["Ctrl+Entrée", "keys.admin"], ["Maj+Entrée", "keys.location"],
-    ["Ctrl+N", "keys.add"], ["Suppr", "keys.remove"], ["F2", "keys.rename"], ["Ctrl+D", "keys.pin"], ["Maj+F10", "keys.menu"],
-    ["Ctrl+Tab", "keys.tabs"], ["Ctrl+F", "keys.search"], ["Ctrl+,", "keys.settings"], ["Échap", "keys.hide"],
+    ["↑ ↓ ← →", "keys.nav"], [k("Enter"), "keys.launch"], [k("DoubleClick"), "keys.launch"], [`Ctrl+${k("Enter")}`, "keys.admin"], [`${k("Shift")}+${k("Enter")}`, "keys.location"],
+    ["Ctrl+N", "keys.add"], [k("Delete"), "keys.remove"], ["F2", "keys.rename"], ["Ctrl+D", "keys.pin"], [`${k("Shift")}+F10`, "keys.menu"],
+    ["Ctrl+Tab", "keys.tabs"], ["Ctrl+F", "keys.search"], ["Ctrl+,", "keys.settings"], [k("Escape"), "keys.hide"],
   ];
 
   const body = h(
@@ -496,6 +510,7 @@ export function openSettings() {
     toggle(t("settings.hideAfterLaunch"), s.hideAfterLaunch, change((v) => (s.hideAfterLaunch = v))),
     toggle(t("settings.showRecents"), s.showRecents, change((v) => (s.showRecents = v))),
     toggle(t("settings.hidePaths"), !!s.hidePaths, change((v) => (s.hidePaths = v)), t("settings.hidePathsSub")),
+    toggle(t("settings.detectNew"), s.detectNewApps !== false, change((v) => (s.detectNewApps = v)), t("settings.detectNewSub")),
     autostart,
 
     h("h4", { text: t("settings.data") }),
@@ -541,14 +556,18 @@ export function openSettings() {
 
     h("h4", { text: t("settings.about") }),
     h("p", { class: "muted small", text: t("settings.version", { v: env.version || "" }) }),
-    h("button", { class: "btn", type: "button", onclick: () => {
-      modal.close();
-      setTimeout(openUpdateDialog, 150);
-    } }, icon("download"), h("span", { text: t("settings.checkUpdate") })),
-    h("button", { class: "btn danger-subtle", type: "button", onclick: async () => {
-      await import("./store.js").then((m) => m.flushSave());
-      invoke("quit_app");
-    } }, h("span", { text: t("settings.quit") }))
+    h(
+      "div",
+      { class: "btn-row about-actions" },
+      h("button", { class: "btn", type: "button", onclick: () => {
+        modal.close();
+        setTimeout(openUpdateDialog, 150);
+      } }, icon("download"), h("span", { text: t("settings.checkUpdate") })),
+      h("button", { class: "btn danger-subtle", type: "button", onclick: async () => {
+        await import("./store.js").then((m) => m.flushSave());
+        invoke("quit_app");
+      } }, icon("close"), h("span", { text: t("settings.quit") }))
+    )
   );
 
   const modal = openModal({ title: t("settings.title"), body, wide: true, className: "settings" });
@@ -657,4 +676,143 @@ export function openUpdateDialog() {
 
   if (s.updateConsent) check();
   else askConsent();
+}
+
+// ---------------------------------------------------------------------------
+// Applications détectées et liste « Pour plus tard »
+function appIcon(c, px = 24) {
+  const url = iconUrl(c, px);
+  const fallback = () => h("span", { class: "glyph" }, icon(c.kind === "url" ? "globe" : "app"));
+  if (!url) return fallback();
+  const img = h("img", { src: url, alt: "", loading: "lazy", decoding: "async", width: px, height: px });
+  img.addEventListener("error", () => img.replaceWith(fallback()), { once: true });
+  return img;
+}
+
+const sourcePill = (c) => (c.source ? h("span", { class: "pill", text: t(`detect.source.${c.source}`) }) : null);
+
+/** Proposition d'ajout des applications installées depuis le dernier passage. */
+export function openDetectedDialog() {
+  if (document.querySelector(".modal.detected")) return;
+  const fresh = freshLater();
+  if (!fresh.length) return;
+  const checked = new Set(fresh.map((_, i) => i));
+  const group = groupSelect(currentGroup());
+  const addLabel = () => t("detect.add", { n: checked.size });
+  const rows = fresh.map((c, i) =>
+    h(
+      "label",
+      { class: "import-row" },
+      h("input", { type: "checkbox", checked: true, onchange: (e) => {
+        e.target.checked ? checked.add(i) : checked.delete(i);
+        const b = modal.dialog.querySelector(".modal-actions .btn.primary");
+        b.textContent = addLabel();
+        b.disabled = !checked.size;
+      } }),
+      h("span", { class: "import-ico" }, appIcon(c)),
+      h("span", { class: "import-name", text: c.name }),
+      sourcePill(c)
+    )
+  );
+  const body = h(
+    "div",
+    { class: "detected-body" },
+    h("div", { class: "update-status" }, h("span", { class: "ico-badge" }, icon("sparkle")), h("p", { text: fresh.length === 1 ? t("detect.textOne", { name: fresh[0].name }) : t("detect.text", { n: fresh.length }) })),
+    h("div", { class: "import-list detected-list", role: "list" }, ...rows),
+    h("label", { class: "field inline" }, h("span", { text: t("add.group") }), group),
+    h("p", { class: "muted small", text: t("detect.hint") })
+  );
+  const modal = openModal({
+    title: fresh.length === 1 ? t("detect.titleOne") : t("detect.title", { n: fresh.length }),
+    body,
+    className: "detected",
+    // Fermer sans choisir = « Plus tard » : rien n'est perdu.
+    onClose: () => {
+      laterMarkSeen();
+      hooks.refreshLater();
+    },
+    actions: [
+      { label: t("detect.ignore"), kind: "subtle", left: true, onClick: () => laterRemove(fresh) },
+      { label: t("detect.later") },
+      {
+        label: addLabel(),
+        kind: "primary",
+        onClick: () => {
+          const chosen = fresh.filter((_, i) => checked.has(i));
+          if (!chosen.length) return false;
+          hooks.afterAdd(laterAdd(chosen, group.value || null));
+        },
+      },
+    ],
+  });
+  modal.dialog.querySelector(".modal-actions .btn.primary")?.focus();
+}
+
+/** Liste « Pour plus tard ». */
+export function openLaterDialog() {
+  if (document.querySelector(".modal.later")) return;
+  laterMarkSeen();
+  hooks.refreshLater();
+  const group = groupSelect(currentGroup());
+  const list = h("div", { class: "import-list later-list", role: "list" });
+  const addAllBtn = () => modal.dialog.querySelector(".modal-actions .btn.primary");
+
+  const renderList = () => {
+    const entries = state.config.later || [];
+    const b = addAllBtn();
+    if (b) b.disabled = !entries.length;
+    if (!entries.length) {
+      list.replaceChildren(h("div", { class: "later-empty" }, h("span", { class: "ico-badge" }, icon("clock")), h("p", { class: "muted", text: t("later.empty") })));
+      return;
+    }
+    list.replaceChildren(
+      ...entries.map((c) =>
+        h(
+          "div",
+          { class: "import-row later-row", role: "listitem" },
+          h("span", { class: "import-ico" }, appIcon(c)),
+          h("span", { class: "import-name", text: c.name }),
+          sourcePill(c),
+          h("button", { class: "btn small", type: "button", onclick: () => {
+            hooks.afterAdd(laterAdd([c], group.value || null));
+            hooks.refreshLater();
+            renderList();
+          } }, icon("plus"), h("span", { text: t("later.add") })),
+          h("button", { class: "icon-btn", type: "button", title: t("later.remove"), "aria-label": `${t("later.remove")} : ${c.name}`, onclick: () => {
+            laterRemove([c]);
+            hooks.refreshLater();
+            renderList();
+          } }, icon("close"))
+        )
+      )
+    );
+  };
+
+  const body = h(
+    "div",
+    { class: "later-body" },
+    h("p", { class: "muted small", text: t("later.text") }),
+    list,
+    h("label", { class: "field inline" }, h("span", { text: t("add.group") }), group)
+  );
+  const modal = openModal({
+    title: t("later.title"),
+    body,
+    wide: true,
+    className: "later",
+    actions: [
+      { label: t("common.close") },
+      {
+        label: t("later.addAll"),
+        kind: "primary",
+        onClick: () => {
+          const entries = [...(state.config.later || [])];
+          if (!entries.length) return false;
+          hooks.afterAdd(laterAdd(entries, group.value || null));
+          hooks.refreshLater();
+        },
+      },
+    ],
+  });
+  renderList();
 }
